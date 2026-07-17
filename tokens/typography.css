@@ -1,0 +1,37 @@
+:root{
+  /* ============ FAMILIES ============ */
+  --font-sans:'Jost','Futura','Century Gothic',-apple-system,'Segoe UI',sans-serif;
+  --font-display:'Jost','Futura','Century Gothic',sans-serif;
+  --font-mono:'SFMono-Regular',ui-monospace,'Menlo',monospace;
+
+  /* ============ WEIGHTS ============ */
+  --fw-light:300;    /* @kind font */
+  --fw-regular:400;  /* @kind font */
+  --fw-medium:500;   /* @kind font */
+  --fw-semibold:600; /* @kind font */
+  --fw-bold:700;     /* @kind font */
+
+  /* ============ TYPE SCALE (1.25 major third-ish, tuned) ============ */
+  --fs-display:clamp(3rem,6vw,5rem); /* @kind font */
+  --fs-h1:3rem;      /* 48 */
+  --fs-h2:2.25rem;   /* 36 */
+  --fs-h3:1.625rem;  /* 26 */
+  --fs-h4:1.25rem;   /* 20 */
+  --fs-lead:1.25rem; /* 20 intro paragraph */
+  --fs-body:1rem;    /* 16 */
+  --fs-sm:0.875rem;  /* 14 */
+  --fs-xs:0.75rem;   /* 12 */
+  --fs-eyebrow:0.8125rem; /* 13 uppercase label */
+
+  /* ============ LINE HEIGHT ============ */
+  --lh-tight:1.08;    /* @kind other */
+  --lh-heading:1.18;  /* @kind other */
+  --lh-body:1.65;     /* @kind other */
+  --lh-snug:1.4;      /* @kind other */
+
+  /* ============ LETTER SPACING ============ */
+  --ls-tight:-0.01em;  /* @kind other */
+  --ls-normal:0;       /* @kind other */
+  --ls-wide:0.04em;    /* @kind other */
+  --ls-eyebrow:0.22em; /* generous tracking for uppercase labels @kind other */
+}

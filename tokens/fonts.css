@@ -1,0 +1,5 @@
+/* Pepper House webfonts.
+   Brand mark and site use a geometric sans (Futura family). Jost is the closest
+   free Google Fonts match to the "pepperhouse" wordmark and is used across the
+   system. SUBSTITUTION — confirm/replace with the licensed brand font if different. */
+@import url('https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');

@@ -1,0 +1,47 @@
+:root{
+  /* ============ BRAND CORE ============ */
+  --ph-red:#E52721;        /* signature chili red — sampled from the logo brushstroke */
+  --ph-red-600:#C81E19;    /* hover / pressed */
+  --ph-red-700:#A81713;    /* deep */
+  --ph-red-050:#FCEAE9;    /* red-tinted surface */
+  --ph-black:#141414;      /* brand black (near-black, softer than #000) */
+  --ph-ink:#000000;        /* true black — logo wordmark */
+  --ph-white:#FFFFFF;
+
+  /* ============ NEUTRALS ============ */
+  --ph-gray-900:#1B1B1B;
+  --ph-gray-800:#2E2E2E;
+  --ph-gray-700:#454545;
+  --ph-gray-600:#5E5E5E;
+  --ph-gray-500:#7A7A7A;
+  --ph-gray-400:#A0A0A0;
+  --ph-gray-300:#CBCBCB;
+  --ph-gray-200:#E4E4E4;
+  --ph-gray-100:#F1F0EE;
+  --ph-gray-050:#F8F7F5;   /* warm off-white page tint */
+
+  /* ============ SEMANTIC ============ */
+  --ph-success:#2F8F53;
+  --ph-warning:#E0A106;
+  --ph-error:var(--ph-red);
+  --ph-info:#2B6CB0;
+
+  /* ---- aliases ---- */
+  --text-strong:var(--ph-ink);
+  --text-body:var(--ph-gray-800);
+  --text-muted:var(--ph-gray-500);
+  --text-inverse:var(--ph-white);
+  --text-brand:var(--ph-red);
+
+  --surface-page:var(--ph-white);
+  --surface-alt:var(--ph-gray-050);
+  --surface-card:var(--ph-white);
+  --surface-dark:var(--ph-black);
+  --surface-brand:var(--ph-red);
+
+  --border-subtle:var(--ph-gray-200);
+  --border-default:var(--ph-gray-300);
+  --border-strong:var(--ph-gray-800);
+
+  --focus-ring:var(--ph-red);
+}
