@@ -1,0 +1,557 @@
+<!DOCTYPE html><html lang="hu"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pepper House — Irodai rendelés</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;font-family:var(--font-sans);color:var(--text-strong)}
+  a{color:var(--ph-red)}
+  img{-webkit-user-drag:none;user-select:none}
+  button{font-family:var(--font-sans)}
+
+  /* ---------- STAGE ---------- */
+  .stage{min-height:100%;display:flex;align-items:stretch}
+
+  /* ---------- DESKTOP NOTICE ---------- */
+  .notice{display:none}
+
+  /* ---------- PHONE / APP ---------- */
+  .phone{width:100%;min-height:100vh;display:flex;flex-direction:column;background:var(--ph-gray-050)}
+  .app{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--ph-gray-050)}
+
+  header.bar{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border-subtle);
+    display:flex;align-items:center;gap:8px;padding:14px 12px}
+  header.bar .logo{height:18px}
+  header.bar .unit{display:flex;flex-direction:column;gap:1px;padding-left:8px;border-left:1px solid var(--border-subtle);line-height:1.1}
+  header.bar .unit b{font-family:var(--font-display);font-weight:700;font-size:12.5px;letter-spacing:.02em;white-space:nowrap}
+  header.bar .unit span{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap}
+  .acct{margin-left:auto;position:relative}
+  .acct>button{display:inline-flex;align-items:center;gap:6px;background:var(--ph-black);color:#fff;border:none;cursor:pointer;
+    padding:4px 9px 4px 4px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+  .acct .avatar{width:22px;height:22px;border-radius:999px;background:var(--ph-red);color:#fff;font-size:9px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;letter-spacing:.05em}
+  .acct .chev{transition:transform .2s}
+  .acct.open .chev{transform:rotate(180deg)}
+  .acct-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:30;background:#fff;border:1px solid var(--border-subtle);
+    border-radius:14px;box-shadow:var(--shadow-md);min-width:216px;padding:6px;opacity:0;transform:translateY(-6px) scale(.98);
+    pointer-events:none;transition:all .18s var(--ease-out)}
+  .acct.open .acct-menu{opacity:1;transform:none;pointer-events:auto}
+  .acct-menu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;text-align:left;cursor:pointer;
+    padding:10px;border-radius:9px;color:var(--text-strong)}
+  .acct-menu button:active{background:var(--ph-gray-050)}
+  .acct-menu .mi{width:34px;height:34px;border-radius:999px;background:var(--ph-gray-050);border:1px solid var(--border-subtle);
+    display:flex;align-items:center;justify-content:center;flex:none}
+  .acct-menu .mt{font-weight:600;font-size:13.5px}
+  .acct-menu .ms{font-weight:300;font-size:11px;color:var(--text-muted);margin-top:1px}
+  .acct-menu .cnt{margin-left:auto;min-width:20px;height:20px;border-radius:999px;background:var(--ph-red-050);color:var(--ph-red-700);
+    font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px}
+  .cartbtn{position:relative;width:38px;height:38px;border-radius:999px;border:1.5px solid var(--border-default);flex:none;
+    background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .cartbtn .badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:999px;background:var(--ph-red);
+    color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;transition:transform .2s}
+  .cartbtn .badge.pulse{animation:pulse .45s var(--ease-out)}
+  @keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.55)}100%{transform:scale(1)}}
+
+  .hero{background:#fff;padding:16px 16px 18px;border-bottom:1px solid var(--border-subtle)}
+  .hero .eb{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--ph-red)}
+  .hero .eb::before{content:"";width:20px;height:2px;background:var(--ph-red)}
+  .hero h1{font-family:var(--font-display);font-weight:700;font-size:23px;line-height:1.15;letter-spacing:-.01em;margin:9px 0 0}
+  .hero p{font-weight:300;font-size:13.5px;line-height:1.55;color:var(--text-muted);margin:7px 0 0}
+
+  nav.tabs{position:sticky;top:67px;z-index:9;background:var(--ph-gray-050);display:flex;gap:8px;overflow-x:auto;
+    padding:14px 16px;scrollbar-width:none}
+  nav.tabs::-webkit-scrollbar{display:none}
+  nav.tabs button{flex:0 0 auto;font-weight:600;font-size:13px;letter-spacing:.02em;
+    padding:9px 16px;border-radius:999px;border:1.5px solid var(--border-default);background:#fff;color:var(--text-body);cursor:pointer;transition:all .15s}
+  nav.tabs button.on{background:var(--ph-red);border-color:var(--ph-red);color:#fff}
+
+  main{flex:1;padding:6px 16px 130px}
+  main.center{display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;padding:34px 22px 130px}
+
+  .gt{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ph-red);margin:24px 2px 10px}
+  .gt::before{content:"";width:18px;height:2px;background:var(--ph-red)}
+  .gt:first-child{margin-top:12px}
+
+  .item{position:relative;display:flex;gap:12px;background:#fff;border:1px solid var(--border-subtle);border-radius:14px;
+    padding:10px;margin-bottom:10px;box-shadow:var(--shadow-xs)}
+  .item .ph{width:92px;height:92px;border-radius:10px;object-fit:cover;flex:none;background:var(--ph-gray-100)}
+  .item .mid{flex:1;min-width:0;display:flex;flex-direction:column;padding:2px 0}
+  .item .nm{font-weight:600;font-size:14.5px;line-height:1.25}
+  .item .ds{font-weight:300;font-size:12.5px;color:var(--text-muted);line-height:1.45;margin-top:3px;padding-right:38px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .item .pr{font-family:var(--font-display);font-weight:700;font-size:15px;margin-top:auto;padding-top:6px}
+  .item .add{position:absolute;right:10px;bottom:10px;width:36px;height:36px;border-radius:999px;border:none;background:var(--ph-red);
+    color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-red);transition:transform .15s,background .2s}
+  .item .add:active{transform:scale(.88)}
+  .item .add.ok{background:var(--ph-red-700)}
+
+  .credit{font-weight:300;font-size:11px;color:var(--text-muted);text-align:center;margin:26px 0 0}
+
+  .empty .ic{width:76px;height:76px;border-radius:999px;background:#fff;border:1px solid var(--border-subtle);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:var(--shadow-sm)}
+  .empty h2{font-family:var(--font-display);font-weight:700;font-size:20px;margin:0 0 8px}
+  .empty p{font-weight:300;font-size:14.5px;line-height:1.6;color:var(--text-muted);margin:0 auto;max-width:280px;text-wrap:pretty}
+  .empty .soon{display:inline-block;margin-top:18px;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ph-red-700);background:var(--ph-red-050);padding:7px 14px;border-radius:999px}
+
+  .cartbar{position:sticky;bottom:0;z-index:10;background:#fff;border-top:1px solid var(--border-subtle);
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px}
+  .cartbar .info{display:flex;flex-direction:column;min-width:0}
+  .cartbar .info .t{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cartbar .info .s{font-size:12px;color:var(--text-muted);font-weight:300}
+  .cartbar>button{margin-left:auto;flex:none;font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+    padding:13px 22px;border-radius:999px;border:none;background:var(--ph-red);color:#fff;cursor:pointer;transition:opacity .25s}
+  .cartbar>button[disabled]{opacity:.4;pointer-events:none}
+
+  /* ---------- SCRIM + SHEETS ---------- */
+  .scrim{position:fixed;inset:0;z-index:40;background:rgba(20,20,20,.45);opacity:0;pointer-events:none;transition:opacity .25s}
+  .scrim.show{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;border-radius:20px 20px 0 0;
+    transform:translateY(105%);transition:transform .32s var(--ease-out);max-height:80%;display:flex;flex-direction:column;
+    box-shadow:0 -12px 40px rgba(20,20,20,.18)}
+  .sheet.show{transform:none}
+  .sheet .grab{width:38px;height:4px;border-radius:999px;background:var(--ph-gray-200);margin:10px auto 0;flex:none}
+  .sheet .sh{display:flex;align-items:center;padding:12px 18px 10px;flex:none}
+  .sheet .sh h2{font-family:var(--font-display);font-weight:700;font-size:19px;margin:0}
+  .sheet .sh .x{margin-left:auto;width:32px;height:32px;border-radius:999px;border:1.5px solid var(--border-default);background:#fff;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:var(--text-body)}
+  .sheet .sc{overflow-y:auto;padding:0 18px 18px;flex:1}
+
+  .cl{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--border-subtle)}
+  .cl:last-of-type{border-bottom:none}
+  .cl .thumb{width:44px;height:44px;border-radius:9px;object-fit:cover;flex:none;background:var(--ph-gray-100)}
+  .cl .cn{flex:1;min-width:0}
+  .cl .cn .n{font-weight:600;font-size:13.5px;line-height:1.3}
+  .cl .cn .p{font-weight:300;font-size:12px;color:var(--text-muted);margin-top:1px}
+  .cl .qty{display:flex;align-items:center;gap:9px;flex:none}
+  .cl .qty button{width:27px;height:27px;border-radius:999px;border:1.5px solid var(--border-default);background:#fff;cursor:pointer;
+    font-size:15px;line-height:1;color:var(--text-body);display:flex;align-items:center;justify-content:center}
+  .cl .qty b{font-family:var(--font-display);font-size:14px;min-width:14px;text-align:center}
+  .cl .lt{flex:none;font-family:var(--font-display);font-weight:700;font-size:13.5px;min-width:64px;text-align:right}
+
+  .sum{display:flex;align-items:baseline;padding:14px 0 4px;border-top:1.5px solid var(--ph-gray-200);margin-top:6px}
+  .sum .l{font-weight:600;font-size:14px}
+  .sum .v{margin-left:auto;font-family:var(--font-display);font-weight:700;font-size:20px}
+  .sum .n{font-weight:300;font-size:11px;color:var(--text-muted)}
+  .paybtn{width:100%;margin-top:12px;padding:15px;border:none;border-radius:999px;background:var(--ph-red);color:#fff;cursor:pointer;
+    font-weight:600;font-size:14px;letter-spacing:.08em;text-transform:uppercase;box-shadow:var(--shadow-red);transition:transform .15s}
+  .paybtn:active{transform:scale(.97)}
+
+  .ol{background:var(--ph-gray-050);border:1px solid var(--border-subtle);border-radius:14px;padding:13px 14px;margin-bottom:10px}
+  .ol .r1{display:flex;align-items:center;gap:8px}
+  .ol .oid{font-family:var(--font-display);font-weight:700;font-size:14.5px}
+  .ol .st{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ph-red-700);
+    background:var(--ph-red-050);padding:4px 9px;border-radius:999px}
+  .ol .dt{font-weight:300;font-size:11.5px;color:var(--text-muted);margin-top:2px}
+  .ol .its{font-weight:300;font-size:12.5px;line-height:1.55;color:var(--text-body);margin-top:8px}
+  .ol .tot{display:flex;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-default);font-size:12px;font-weight:600}
+  .ol .tot b{margin-left:auto;font-family:var(--font-display);font-size:14px}
+
+  /* ---------- CONFIRM ---------- */
+  .confirm{position:fixed;inset:0;z-index:60;background:#fff;display:none;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:32px 26px}
+  .confirm.show{display:flex;animation:fadein .3s var(--ease-out)}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+  .ck{width:88px;height:88px;margin-bottom:22px}
+  .ck circle{fill:none;stroke:var(--ph-red);stroke-width:2.5;stroke-dasharray:151;stroke-dashoffset:151;animation:dash .7s var(--ease-out) forwards}
+  .ck path{fill:none;stroke:var(--ph-red);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:36;stroke-dashoffset:36;
+    animation:dash .45s .5s var(--ease-out) forwards}
+  @keyframes dash{to{stroke-dashoffset:0}}
+  .confirm h2{font-family:var(--font-display);font-weight:700;font-size:24px;margin:0 0 6px;letter-spacing:-.01em}
+  .confirm .meta{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ph-red-700);
+    background:var(--ph-red-050);padding:7px 14px;border-radius:999px;margin:10px 0 16px}
+  .confirm p{font-weight:300;font-size:14px;line-height:1.65;color:var(--text-muted);max-width:300px;margin:0;text-wrap:pretty}
+  .confirm p b{color:var(--text-strong);font-weight:600}
+  .confirm .cta{margin-top:26px;display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px}
+  .confirm .cta .pri{padding:14px;border:none;border-radius:999px;background:var(--ph-red);color:#fff;cursor:pointer;
+    font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;box-shadow:var(--shadow-red)}
+  .confirm .cta .sec{padding:13px;border:1.5px solid var(--border-default);border-radius:999px;background:#fff;color:var(--text-body);
+    cursor:pointer;font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase}
+
+  .toast{position:fixed;bottom:104px;left:50%;transform:translate(-50%,10px);z-index:70;background:var(--ph-black);color:#fff;
+    font-size:12.5px;font-weight:500;padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s var(--ease-out);
+    max-width:82%;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  .fly{position:fixed;z-index:80;border-radius:10px;object-fit:cover;pointer-events:none}
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  }
+
+  /* ---------- DESKTOP LAYOUT ---------- */
+  @media (min-width:820px){
+    .stage{background:radial-gradient(circle at 30% 20%,#232323,#0b0b0b);padding:48px;gap:60px;justify-content:center;align-items:center}
+    .notice{display:flex;flex-direction:column;max-width:420px;color:#fff}
+    .notice img.logo{height:34px;width:auto;margin-bottom:34px;align-self:flex-start}
+    .notice .eb{display:inline-flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--ph-red)}
+    .notice .eb::before{content:"";width:26px;height:2px;background:var(--ph-red)}
+    .notice h1{font-family:var(--font-display);font-weight:700;font-size:38px;line-height:1.1;letter-spacing:-.01em;margin:16px 0 0}
+    .notice p{font-weight:300;font-size:17px;line-height:1.6;color:rgba(255,255,255,.78);margin:16px 0 0}
+    .notice .qrrow{display:flex;align-items:center;gap:18px;margin-top:30px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px}
+    .notice .qrrow #dqr{width:104px;height:104px;background:#fff;padding:8px;border-radius:8px}
+    .notice .qrrow #dqr img,.notice .qrrow #dqr canvas{width:88px!important;height:88px!important;display:block}
+    .notice .qrrow .qt{font-weight:600;font-size:14px}
+    .notice .qrrow .qs{font-weight:300;font-size:13px;color:rgba(255,255,255,.7);margin-top:4px}
+    .notice .tbl{margin-top:22px;font-size:14px;color:rgba(255,255,255,.7);font-weight:300}
+    .notice .tbl b{font-family:var(--font-display);color:#fff;font-size:16px}
+
+    .phone{flex:0 0 auto;width:390px;height:800px;min-height:0;border-radius:44px;border:12px solid #1c1c1c;
+      box-shadow:0 40px 90px rgba(0,0,0,.55),inset 0 0 0 2px #333;overflow:hidden;position:relative;transform:translateZ(0)}
+    .phone::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:26px;
+      background:#1c1c1c;border-radius:0 0 18px 18px;z-index:20}
+    .app{border-radius:32px;overflow-y:auto}
+    /* a "notch" alatt kezdődjön a fejléc tartalma, mint egy igazi telefonon */
+    header.bar{padding-top:38px}
+    nav.tabs{top:91px}
+    .toast{bottom:120px}
+  }
+</style></head>
+<body>
+<div class="stage">
+  <!-- Desktop-only figyelemfelhívás -->
+  <aside class="notice">
+    <img class="logo" src="../../assets/pepperhouse-logo-inverse.png" alt="Pepper House">
+    <span class="eb">Irodai rendelés</span>
+    <h1>Ez a felület a telefonodra készült.</h1>
+    <p>A Pepper irodai rendelés élménye mobilon a legjobb — ott kényelmesen böngészheted a fogásokat, és pár koppintással rendelhetsz közvetlenül az irodádból.</p>
+    <div class="qrrow">
+      <div id="dqr"></div>
+      <div><div class="qt">Nyisd meg a telefonodon</div><div class="qs">Olvasd be a kódot, és máris rendelhetsz.</div></div>
+    </div>
+    <div class="tbl">Egységed: <b>Knorr — 105</b></div>
+  </aside>
+
+  <!-- A mobil app -->
+  <div class="phone"><div class="app">
+    <header class="bar">
+      <img class="logo" src="../../assets/pepperhouse-logo.png" alt="Pepper House">
+      <span class="unit"><b>Knorr</b><span>105 egység</span></span>
+
+      <div class="acct" id="acct">
+        <button id="acctBtn" aria-haspopup="true" aria-expanded="false">
+          <span class="avatar">MG</span>Minta Géza
+          <svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="acct-menu" id="acctMenu">
+          <button id="miAccount">
+            <span class="mi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ph-black)" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4"/></svg></span>
+            <span><span class="mt">Fiókom</span><br><span class="ms">A demóban nem elérhető</span></span>
+          </button>
+          <button id="miOrders">
+            <span class="mi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ph-black)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a1 1 0 0 1 1 1v17l-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1Z"/><path d="M9.5 8.5h5M9.5 12h5"/></svg></span>
+            <span><span class="mt">Rendeléseim</span></span>
+            <span class="cnt" id="ordCnt" hidden>0</span>
+          </button>
+        </div>
+      </div>
+
+      <button class="cartbtn" id="cartBtn" aria-label="Kosár">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ph-black)" stroke-width="1.7"><path d="M4 5h2l1.5 11.5a1.5 1.5 0 0 0 1.5 1.3h8a1.5 1.5 0 0 0 1.5-1.2L20 8H6.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="20.5" r="1.2" fill="var(--ph-black)" stroke="none"/><circle cx="17.5" cy="20.5" r="1.2" fill="var(--ph-black)" stroke="none"/></svg>
+        <span class="badge" id="cartBadge">0</span>
+      </button>
+    </header>
+
+    <section class="hero">
+      <span class="eb">Pepper House</span>
+      <h1>Ma nálunk ebédelsz, Géza?</h1>
+      <p>Böngészd végig a mai kínálatot, és rendelj közvetlenül az irodádból.</p>
+    </section>
+
+    <nav class="tabs" id="tabs"></nav>
+
+    <main id="content"></main>
+
+    <div class="cartbar">
+      <div class="info"><span class="t" id="cbT">A kosarad üres</span><span class="s" id="cbS">Adj hozzá fogásokat a rendeléshez</span></div>
+      <button id="orderBtn" disabled>Megrendelem</button>
+    </div>
+
+    <!-- Kosár / Rendeléseim lapok -->
+    <div class="scrim" id="scrim"></div>
+    <section class="sheet" id="cartSheet" aria-label="Kosár">
+      <div class="grab"></div>
+      <div class="sh"><h2>Kosaram</h2><button class="x" id="cartX" aria-label="Bezárás">✕</button></div>
+      <div class="sc" id="cartList"></div>
+    </section>
+    <section class="sheet" id="ordSheet" aria-label="Rendeléseim">
+      <div class="grab"></div>
+      <div class="sh"><h2>Rendeléseim</h2><button class="x" id="ordX" aria-label="Bezárás">✕</button></div>
+      <div class="sc" id="ordList"></div>
+    </section>
+
+    <div class="confirm" id="confirm"></div>
+    <div class="toast" id="toast"></div>
+  </div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  /* =====================================================================
+     Pepper House — irodai rendelés DEMO. Semmi nem "igazi": a fizetés
+     csak visszaigazoló képernyő, a rendelések a böngészőben tárolódnak.
+     Fotók: Wikimedia Commons (CC / közkincs), lásd az IMG URL-eket.
+     ===================================================================== */
+  const WM = f => 'https://commons.wikimedia.org/wiki/Special:FilePath/' + f + '?width=480';
+  const FALLBACK = 'data:image/svg+xml,' + encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' fill='#F1F0EE'/><g fill='none' stroke='#E52721' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M28 44h40v10a12 12 0 0 1-12 12H40a12 12 0 0 1-12-12V44Z'/><path d='M23 44h50'/><path d='M40 34c0-3 2.4-3.6 2.4-6.6M48 34c0-3 2.4-3.6 2.4-6.6M56 34c0-3 2.4-3.6 2.4-6.6'/></g></svg>");
+
+  const MENU = {
+    etelek: { label:'Ételek', groups:[
+      { title:'Napi menük', items:[
+        { id:'menu-a', name:'Menü A', desc:'Pázmándi gombócgulyás + parajos rizses rakottas', price:1890, img:WM('Guly%C3%A1sleves.jpg') },
+        { id:'menu-b', name:'Menü B', desc:'Meggyleves + csülök pékné módra', price:2090, img:WM('Pork_knuckle_sg.JPG') },
+        { id:'menu-fit', name:'Fitt ajánlat', desc:'Cheddaros füstölt sonkás csirkemell kevert salátával és zöldséges kuszkusszal', price:2990, img:WM('Masala_Grilled_Chicken_with_Baby_Potatoes,_Salad.JPG') },
+      ]},
+      { title:'Leves', items:[
+        { id:'leves-1', name:'Nyári zöldségleves', desc:'Friss idényzöldségekkel, kis adag', price:890, img:WM('Vegetable_soup.jpg') },
+      ]},
+      { title:'Főételek', items:[
+        { id:'fo-1', name:'Rántott csirkemellfilé', desc:'Frissensült — jázmin rizzsel vagy steakburgonyával', price:1990, img:WM('Chicken_schnitzel_and_chips_with_jaeger_gravy.jpg') },
+        { id:'fo-2', name:'Cigánypecsenye', desc:'Grill klasszikus, választható körettel', price:2090, img:WM('Cig%C3%A1nypecsenye.jpg') },
+        { id:'fo-3', name:'Túrós csusza', desc:'Készétel — tepertővel, ahogy illik', price:1690, img:WM('Turos_csusza.jpg') },
+      ]},
+      { title:'Desszert', items:[
+        { id:'de-1', name:'Somlói galuska', desc:'Vaníliakrémmel és csokoládéöntettel', price:890, img:WM('Soml%C3%B3i_galuska.jpg') },
+      ]},
+    ]},
+    italok: { label:'Italok', groups:[
+      { title:'Üdítők', items:[
+        { id:'it-1', name:'Coca-Cola', desc:'0,33 l, jéghidegen', price:590, img:WM('Serving_ice_cold_cola.jpg') },
+        { id:'it-2', name:'Ásványvíz', desc:'0,5 l — szénsavas vagy mentes', price:390, img:WM('Sparkling_Water_(4675945072).jpg') },
+        { id:'it-3', name:'Házi limonádé', desc:'4 dl, friss gyümölccsel és mentával', price:790, img:WM('Different_types_of_homemade_lemonade_with_berries_and_fruits.jpg') },
+        { id:'it-4', name:'100% narancslé', desc:'0,25 l, frissen facsart', price:590, img:WM('Orange_juice_1_edit1.jpg') },
+      ]},
+    ]},
+    snackek: { label:'Snackek', groups:[], empty:{ noun:'a snackek', text:'A snackek még pihennek. Nemsokára roppanós falatokkal térünk vissza — nézz vissza később!' } },
+    kavek: { label:'Kávék', groups:[
+      { title:'Kávék', items:[
+        { id:'ka-1', name:'Espresso', desc:'Dupla ristretto kérésre', price:490, img:WM('A_cup_of_espresso.jpg') },
+        { id:'ka-2', name:'Cappuccino', desc:'Selymes tejhabbal', price:690, img:WM('Cappuccino_at_Sightglass_Coffee.jpg') },
+        { id:'ka-3', name:'Caffè latte', desc:'Latte arttal, ha a barista jókedvű', price:790, img:WM('Latte_art.jpg') },
+      ]},
+    ]},
+  };
+  const ITEMS = {}; Object.values(MENU).forEach(c => (c.groups||[]).forEach(g => g.items.forEach(it => ITEMS[it.id] = it)));
+
+  const potIcon = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--ph-red)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10h14v4a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-4Z"/><path d="M3 10h18"/><path d="M9 6.5c0-1 .8-1.2.8-2.2M12 6.5c0-1 .8-1.2.8-2.2M15 6.5c0-1 .8-1.2.8-2.2"/></svg>';
+  const $ = id => document.getElementById(id);
+  const ft = n => n.toLocaleString('hu-HU') + ' Ft';
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+  let active = 'etelek';
+  let cart = {};            // id -> qty
+  let orders = [];
+  try { orders = JSON.parse(localStorage.getItem('ph-iroda-orders') || '[]'); } catch(e) {}
+
+  /* ---------- render: tabs + lista ---------- */
+  function renderTabs(){
+    const t = $('tabs'); t.innerHTML = '';
+    Object.entries(MENU).forEach(([id,c]) => {
+      const b = document.createElement('button'); b.textContent = c.label;
+      b.className = id===active ? 'on' : '';
+      b.onclick = () => { active = id; renderTabs(); renderContent(); };
+      t.appendChild(b);
+    });
+  }
+  function renderContent(){
+    const c = MENU[active], m = $('content');
+    if (!c.groups.length){
+      m.className = 'center';
+      m.innerHTML = '<div class="empty"><div class="ic">'+potIcon+'</div>'+
+        '<h2>Már készülnek '+c.empty.noun+'</h2><p>'+c.empty.text+'</p>'+
+        '<span class="soon">Hamarosan</span></div>';
+      return;
+    }
+    m.className = '';
+    m.innerHTML = c.groups.map(g =>
+      '<h3 class="gt">'+g.title+'</h3>' +
+      g.items.map(it =>
+        '<article class="item">'+
+          '<img class="ph" loading="lazy" src="'+it.img+'" alt="'+esc(it.name)+'" onerror="this.onerror=null;this.src=FALLBACK">'+
+          '<div class="mid"><span class="nm">'+esc(it.name)+'</span><span class="ds">'+esc(it.desc)+'</span>'+
+          '<span class="pr">'+ft(it.price)+'</span></div>'+
+          '<button class="add" data-add="'+it.id+'" aria-label="'+esc(it.name)+' kosárba">'+
+            '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'+
+          '</button>'+
+        '</article>').join('')
+    ).join('') + '<p class="credit">Az árak forintban értendők. A fotók illusztrációk — Wikimedia Commons.</p>';
+  }
+
+  /* ---------- kosár ---------- */
+  const count = () => Object.values(cart).reduce((a,b)=>a+b,0);
+  const total = () => Object.entries(cart).reduce((a,[id,q])=>a+ITEMS[id].price*q,0);
+
+  function syncCart(pulse){
+    const n = count(), badge = $('cartBadge');
+    badge.textContent = n;
+    if (pulse){ badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse'); }
+    if (n){
+      $('cbT').textContent = n + ' tétel a kosaradban';
+      $('cbS').textContent = 'Összesen ' + ft(total());
+      $('orderBtn').disabled = false;
+    } else {
+      $('cbT').textContent = 'A kosarad üres';
+      $('cbS').textContent = 'Adj hozzá fogásokat a rendeléshez';
+      $('orderBtn').disabled = true;
+    }
+  }
+
+  function flyToCart(imgEl){
+    if (!imgEl || matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+    const from = imgEl.getBoundingClientRect(), to = $('cartBtn').getBoundingClientRect();
+    const cl = imgEl.cloneNode();
+    cl.className = 'fly'; cl.removeAttribute('loading');
+    Object.assign(cl.style, { left:from.left+'px', top:from.top+'px', width:from.width+'px', height:from.height+'px' });
+    document.body.appendChild(cl);
+    cl.animate([
+      { transform:'translate(0,0) scale(1)', opacity:1, borderRadius:'10px' },
+      { transform:'translate('+(to.left+to.width/2-from.left-from.width/2)+'px,'+(to.top+to.height/2-from.top-from.height/2)+'px) scale(.12)', opacity:.35, borderRadius:'999px' },
+    ], { duration:620, easing:'cubic-bezier(.5,-.1,.75,.4)' }).onfinish = () => cl.remove();
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-add]');
+    if (!btn) return;
+    const id = btn.dataset.add;
+    cart[id] = (cart[id]||0) + 1;
+    flyToCart(btn.closest('.item').querySelector('.ph'));
+    setTimeout(() => syncCart(true), 480);
+    btn.classList.add('ok');
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 5 5L20 7"/></svg>';
+    setTimeout(() => {
+      btn.classList.remove('ok');
+      btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+    }, 900);
+  });
+
+  /* ---------- lapok (sheet) ---------- */
+  let openSheet = null;
+  function show(id){
+    hideSheets();
+    openSheet = id;
+    $('scrim').classList.add('show');
+    $(id).classList.add('show');
+  }
+  function hideSheets(){
+    $('scrim').classList.remove('show');
+    ['cartSheet','ordSheet'].forEach(s => $(s).classList.remove('show'));
+    openSheet = null;
+  }
+  $('scrim').onclick = hideSheets;
+  $('cartX').onclick = hideSheets;
+  $('ordX').onclick = hideSheets;
+
+  function renderCartSheet(){
+    const el = $('cartList'), ids = Object.keys(cart);
+    if (!ids.length){
+      el.innerHTML = '<div class="empty" style="text-align:center;padding:26px 0 34px"><div class="ic">'+potIcon+'</div>'+
+        '<h2>A kosarad üres</h2><p>Válogass a mai kínálatból, és adj hozzá fogásokat!</p></div>';
+      return;
+    }
+    el.innerHTML = ids.map(id => {
+      const it = ITEMS[id], q = cart[id];
+      return '<div class="cl">'+
+        '<img class="thumb" src="'+it.img+'" alt="" onerror="this.onerror=null;this.src=FALLBACK">'+
+        '<div class="cn"><div class="n">'+esc(it.name)+'</div><div class="p">'+ft(it.price)+' / db</div></div>'+
+        '<div class="qty"><button data-dec="'+id+'" aria-label="Kevesebb">−</button><b>'+q+'</b><button data-inc="'+id+'" aria-label="Több">+</button></div>'+
+        '<span class="lt">'+ft(it.price*q)+'</span></div>';
+    }).join('') +
+    '<div class="sum"><span class="l">Összesen <span class="n">· '+count()+' tétel</span></span><span class="v">'+ft(total())+'</span></div>'+
+    '<button class="paybtn" id="payBtn">Fizetem · '+ft(total())+'</button>';
+    $('payBtn').onclick = placeOrder;
+  }
+  $('cartList').addEventListener('click', e => {
+    const inc = e.target.closest('[data-inc]'), dec = e.target.closest('[data-dec]');
+    if (inc){ cart[inc.dataset.inc]++; }
+    else if (dec){
+      const id = dec.dataset.dec;
+      if (--cart[id] <= 0) delete cart[id];
+    } else return;
+    syncCart(false); renderCartSheet();
+  });
+
+  const openCart = () => { renderCartSheet(); show('cartSheet'); };
+  $('cartBtn').onclick = openCart;
+  $('orderBtn').onclick = openCart;
+
+  /* ---------- rendelés + visszaigazolás ---------- */
+  function placeOrder(){
+    const o = {
+      id: 'PH-' + (1000 + Math.floor(Math.random()*9000)),
+      at: new Date().toISOString(),
+      items: Object.entries(cart).map(([id,q]) => ({ name: ITEMS[id].name, qty:q, price:ITEMS[id].price })),
+      total: total(),
+    };
+    orders.unshift(o);
+    try { localStorage.setItem('ph-iroda-orders', JSON.stringify(orders)); } catch(e) {}
+    cart = {};
+    syncCart(false); syncOrdCnt(); hideSheets();
+
+    const c = $('confirm');
+    c.innerHTML =
+      '<svg class="ck" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M14 27l8 8 16-16"/></svg>'+
+      '<h2>Köszönjük a rendelésed!</h2>'+
+      '<span class="meta">'+o.id+' · '+ft(o.total)+'</span>'+
+      '<p>A rendelésed részleteit megtalálod a <b>Rendeléseim</b> menüpontban, visszaigazolást pedig a <b>geza@minta.hu</b> címre küldtünk. Hamarosan kopogunk az irodád ajtaján.</p>'+
+      '<div class="cta"><button class="pri" id="cfOk">Rendben</button><button class="sec" id="cfOrd">Rendeléseim</button></div>';
+    c.classList.add('show');
+    $('cfOk').onclick = () => c.classList.remove('show');
+    $('cfOrd').onclick = () => { c.classList.remove('show'); renderOrdSheet(); show('ordSheet'); };
+  }
+
+  /* ---------- rendeléseim ---------- */
+  function syncOrdCnt(){
+    const el = $('ordCnt');
+    el.hidden = !orders.length;
+    el.textContent = orders.length;
+  }
+  function renderOrdSheet(){
+    const el = $('ordList');
+    if (!orders.length){
+      el.innerHTML = '<div class="empty" style="text-align:center;padding:26px 0 34px"><div class="ic">'+potIcon+'</div>'+
+        '<h2>Még nincs rendelésed</h2><p>Add le az elsőt a mai étlapról — pár koppintás az egész!</p></div>';
+      return;
+    }
+    el.innerHTML = orders.map(o => {
+      const d = new Date(o.at);
+      const when = d.toLocaleDateString('hu-HU') + ' ' + d.toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'});
+      return '<div class="ol"><div class="r1"><span class="oid">'+o.id+'</span><span class="st">Leadva</span></div>'+
+        '<div class="dt">'+when+' · Knorr 105 egység</div>'+
+        '<div class="its">'+o.items.map(i => i.qty+'× '+esc(i.name)).join(' · ')+'</div>'+
+        '<div class="tot">Összesen<b>'+ft(o.total)+'</b></div></div>';
+    }).join('');
+  }
+
+  /* ---------- fiók legördülő ---------- */
+  const acct = $('acct');
+  $('acctBtn').onclick = e => {
+    e.stopPropagation();
+    acct.classList.toggle('open');
+    $('acctBtn').setAttribute('aria-expanded', acct.classList.contains('open'));
+  };
+  document.addEventListener('click', e => { if (!acct.contains(e.target)) acct.classList.remove('open'); });
+  $('miAccount').onclick = () => { acct.classList.remove('open'); toast('A Fiókom a demóban még nem elérhető.'); };
+  $('miOrders').onclick = () => { acct.classList.remove('open'); renderOrdSheet(); show('ordSheet'); };
+
+  /* ---------- toast ---------- */
+  let toastT;
+  function toast(msg){
+    const t = $('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  /* ---------- init ---------- */
+  renderTabs(); renderContent(); syncCart(false); syncOrdCnt();
+
+  window.addEventListener('load', () => {
+    if (typeof QRCode !== 'undefined'){
+      new QRCode($('dqr'), { text:'https://pepperasztal.vercel.app/iroda', width:88, height:88,
+        colorDark:'#141414', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    }
+  });
+</script>
+</body></html>
