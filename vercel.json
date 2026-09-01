@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/deliverables/pepperasztal/index.html" }
+    { "source": "/", "destination": "/deliverables/pepperasztal/index.html" },
+    { "source": "/iroda", "destination": "/deliverables/pepperiroda/index.html" }
   ]
 }
