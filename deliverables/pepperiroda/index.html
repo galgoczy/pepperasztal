@@ -240,39 +240,34 @@
   /* fixed, hogy mobilon a képernyőt fedje (a .phone a teljes görgethető tartalom magas) */
   .splash{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;overflow:hidden;
     background:radial-gradient(circle at 50% 44%,#F5514B 0%,#E52721 46%,#A8120D 100%);
-    animation:splashOut .55s 2.05s var(--ease-out) forwards}
+    animation:splashOut .4s 1.82s linear forwards}
   .splash::after{content:"";position:absolute;inset:0;pointer-events:none;
     background:radial-gradient(circle at 50% 44%,transparent 46%,rgba(78,6,4,.55) 100%)}
   @keyframes splashOut{to{opacity:0;visibility:hidden}}
 
-  /* meleg fény dagad fel a logó mögött */
+  /* meleg fény dagad fel a logó mögött (a logó színét nem érinti) */
   .sGlow{position:absolute;width:148%;aspect-ratio:1;border-radius:50%;pointer-events:none;
-    background:radial-gradient(circle,rgba(255,216,128,.46) 0%,rgba(255,124,58,.2) 34%,transparent 66%);
-    animation:glowUp 2.3s var(--ease-out) both}
-  @keyframes glowUp{0%{transform:scale(.4);opacity:0}45%{opacity:1}100%{transform:scale(1.08);opacity:.6}}
+    background:radial-gradient(circle,rgba(255,216,128,.4) 0%,rgba(255,124,58,.18) 34%,transparent 66%);
+    animation:glowUp 1.8s var(--ease-out) both}
+  @keyframes glowUp{0%{transform:scale(.45);opacity:0}55%{opacity:1}100%{transform:scale(1.06);opacity:.75}}
 
-  /* két kifutó gyűrű, mint egy lökethullám */
-  .sRing{position:absolute;width:190px;height:190px;border-radius:50%;pointer-events:none;
-    border:1.5px solid rgba(255,255,255,.45);animation:ringOut 1.9s .55s cubic-bezier(.16,1,.3,1) both}
-  .sRing.r2{animation-delay:1s}
-  @keyframes ringOut{0%{transform:scale(.45);opacity:0}22%{opacity:.5}100%{transform:scale(2.7);opacity:0}}
-
-  /* a logó enyhe túllendüléssel érkezik, majd végigfut rajta a fénycsík */
-  .splashLogo{position:relative;width:min(62%,228px);animation:logoPop .85s .1s cubic-bezier(.34,1.5,.64,1) both}
+  /* A logó egyszerűen előtűnik, majd hirtelen belerohan a kamerába. */
+  .splashLogo{position:relative;width:min(62%,228px);
+    animation:logoFade .75s .12s var(--ease-out) both,
+              logoRush .52s 1.5s cubic-bezier(.58,0,.86,.28) both}
   .splashLogo img{width:100%;display:block}
-  @keyframes logoPop{from{opacity:0;transform:scale(.74)}to{opacity:1;transform:scale(1)}}
-  .splashLogo .shine{position:absolute;inset:0;pointer-events:none;
-    -webkit-mask-image:url(../../assets/pepperhouse-logo-inverse.png);mask-image:url(../../assets/pepperhouse-logo-inverse.png);
-    -webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
-    background:linear-gradient(100deg,transparent 40%,rgba(255,255,255,.95) 50%,transparent 60%);
-    background-size:250% 100%;background-repeat:no-repeat;
-    animation:shine 1.2s .62s var(--ease-standard) both}
-  @keyframes shine{from{background-position:-80% 0}to{background-position:170% 0}}
+  @keyframes logoFade{from{opacity:0}to{opacity:1}}
+  @keyframes logoRush{
+    0%{transform:scale(1);filter:blur(0)}
+    100%{transform:scale(7);opacity:0;filter:blur(7px)}
+  }
 
   /* a felirat betűköze kinyílik, ahogy előtűnik */
   .splashTag{position:absolute;left:0;right:0;bottom:14%;text-align:center;color:#fff;
-    font-size:10.5px;font-weight:600;text-transform:uppercase;animation:tagIn .95s .8s var(--ease-out) both}
+    font-size:10.5px;font-weight:600;text-transform:uppercase;
+    animation:tagIn .8s .5s var(--ease-out) both,tagOut .3s 1.45s var(--ease-out) both}
   @keyframes tagIn{from{opacity:0;letter-spacing:.1em}to{opacity:.88;letter-spacing:.34em}}
+  @keyframes tagOut{to{opacity:0;transform:translateY(6px)}}
 
   /* ---------- FŐOLDAL BEÚSZÁSA ---------- */
   @keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -295,8 +290,40 @@
 
   /* Görgetés közbeni kiemelés: a fókuszsávban lévő kártya kicsit megnő.
      A JS csak a .focusable elemeken állít transformot, a beúszás után. */
-  /* Beúszás után a JS veszi át a transformot, ezért az animációt itt elengedjük. */
-  main>.item.focusable{animation:none;opacity:1;transform:none;transition:transform .15s var(--ease-standard)}
+  /* Beúszás után a JS veszi át a transformot, ezért az animációt itt elengedjük.
+     A hosszabb átmenet csillapítja a képkockánkénti frissítést — így lesz lágy. */
+  main>.item.focusable{animation:none;opacity:1;transform:none;will-change:transform;
+    transition:transform .34s cubic-bezier(.22,1,.36,1)}
+
+  /* ---------- MIKROANIMÁCIÓK ---------- */
+  /* hullám a gombnyomásra */
+  nav.tabs button,.item .add,.paybtn,.mbtn,.amts button,.rw .rb,.daybtn,.orderbtn,.codebtn,
+  .acct-menu button,.sheet .sh .x,.cl .qty button,.topcta,.banner{overflow:hidden}
+  /* A .item .add szándékosan kimarad: az abszolút pozíciója is befoglaló blokk. */
+  nav.tabs button,.paybtn,.mbtn,.amts button,.rw .rb,.daybtn,.orderbtn,.codebtn,
+  .acct-menu button,.sheet .sh .x,.cl .qty button{position:relative}
+  .rw-ink{position:absolute;border-radius:50%;background:currentColor;opacity:.3;pointer-events:none;
+    transform:scale(0);animation:inkOut .6s var(--ease-out) forwards}
+  @keyframes inkOut{to{transform:scale(1);opacity:0}}
+
+  /* egységes lenyomás-visszajelzés */
+  nav.tabs button:active,.amts button:active,.mbtn:active,.rw .rb:active,.acct-menu button:active,
+  .cl .qty button:active,.sheet .sh .x:active,.daybtn:active{transform:scale(.93)}
+  .paybtn:active,.orderbtn:active,.topcta:active,.banner:active{transform:scale(.975)}
+  nav.tabs button,.amts button,.mbtn,.rw .rb,.acct-menu button,.cl .qty button,.sheet .sh .x,
+  .paybtn,.orderbtn,.banner{transition:transform .13s var(--ease-out),background .18s,border-color .18s,color .18s}
+
+  /* az épp aktív kategória megpattan */
+  nav.tabs button.on{animation:tabPop .34s var(--ease-out)}
+  @keyframes tabPop{0%{transform:scale(.9)}58%{transform:scale(1.07)}100%{transform:scale(1)}}
+
+  /* mennyiség léptetésekor a szám felugrik */
+  .cl .qty b.bump{animation:qBump .3s var(--ease-out)}
+  @keyframes qBump{0%{transform:scale(1)}45%{transform:scale(1.35);color:var(--ph-red)}100%{transform:scale(1)}}
+
+  /* a kosárba tett tétel ára villan egyet */
+  .item .pr.hit{animation:prHit .5s var(--ease-out)}
+  @keyframes prHit{0%{color:var(--text-strong)}30%{color:var(--ph-red);transform:translateX(2px)}100%{color:var(--text-strong)}}
 
   /* ---------- HETI BANNER ---------- */
   .banner{position:relative;display:block;width:100%;overflow:hidden;margin:14px 0 0;padding:15px 16px 16px;
@@ -439,11 +466,8 @@
     <!-- Indítóképernyő: a logón végigfut egy fénycsík, majd felúszik a fejlécbe -->
     <div class="splash" id="splash">
       <span class="sGlow"></span>
-      <span class="sRing"></span>
-      <span class="sRing r2"></span>
       <div class="splashLogo">
         <img src="../../assets/pepperhouse-logo-inverse.png" alt="Pepper House">
-        <span class="shine"></span>
       </div>
       <div class="splashTag">Irodai rendelés</div>
     </div>
@@ -480,6 +504,10 @@
             <span class="cnt" id="ordCnt" hidden>0</span>
           </button>
           <div class="sep"></div>
+          <button id="miInstall" hidden>
+            <span class="mi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ph-black)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7.5v7m0 0 2.6-2.6M12 14.5l-2.6-2.6"/></svg></span>
+            <span><span class="mt">Kitűzés a telefonra</span><br><span class="ms">Nyíljon önálló appként</span></span>
+          </button>
           <button id="miAccount">
             <span class="mi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ph-black)" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4"/></svg></span>
             <span><span class="mt">Fiókom</span><br><span class="ms">A demóban nem elérhető</span></span>
@@ -681,6 +709,24 @@
   /* Törzskártyás az, akinek van feltöltött egyenlege. */
   const isMember = () => balance > 0;
 
+  /* ---------- hullám-effekt a gombnyomásokra ---------- */
+  const INK = 'nav.tabs button,.item .add,.paybtn,.mbtn,.amts button,.rw .rb,.daybtn,.orderbtn,' +
+              '.codebtn,.acct-menu button,.sheet .sh .x,.cl .qty button,.topcta,.banner';
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest(INK);
+    if (!b || matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+    const r = b.getBoundingClientRect();
+    /* akkora kör, ami a legtávolabbi sarkot is eléri */
+    const size = Math.hypot(Math.max(e.clientX - r.left, r.right - e.clientX),
+                            Math.max(e.clientY - r.top, r.bottom - e.clientY)) * 2;
+    const ink = document.createElement('span');
+    ink.className = 'rw-ink';
+    ink.style.cssText = 'width:' + size + 'px;height:' + size + 'px;left:' +
+      (e.clientX - r.left - size / 2) + 'px;top:' + (e.clientY - r.top - size / 2) + 'px';
+    b.appendChild(ink);
+    ink.addEventListener('animationend', () => ink.remove(), { once:true });
+  }, { passive:true });
+
   /* ---------- görgetésre beúszás + kiemelés ---------- */
   let io = null, focusItems = [];
 
@@ -719,12 +765,17 @@
   function focusTick(){
     ticking = false;
     if (!focusItems.length) return;
-    const vh = innerHeight, band = vh * .46, reach = vh * .34;
+    const vh = innerHeight, band = vh * .44, reach = vh * .42;
     focusItems.forEach(el => {
       const r = el.getBoundingClientRect();
-      if (r.bottom < -40 || r.top > vh + 40){ if (el.style.transform) el.style.transform = ''; return; }
+      if (r.bottom < -60 || r.top > vh + 60){
+        if (el.style.transform){ el.style.transform = ''; el.style.zIndex = ''; }
+        return;
+      }
       const d = Math.min(1, Math.abs(r.top + r.height / 2 - band) / reach);
-      el.style.transform = 'scale(' + (1 + (1 - d) * .035).toFixed(4) + ')';
+      const t = 1 - d, e = t * t * (3 - 2 * t);   // smoothstep: lágy fel- és lefutás
+      el.style.transform = 'scale(' + (1 + e * .09).toFixed(4) + ')';
+      el.style.zIndex = e > .45 ? '2' : '';        // a kiemelt kártya a szomszédai fölé kerül
     });
   }
   function onScroll(){
@@ -736,13 +787,27 @@
   addEventListener('resize', onScroll);
 
   /* ---------- render: tabs + lista ---------- */
+  /* A gombokat egyszer építjük fel és utána csak az állapotukat váltjuk:
+     így az újrarajzolás nem törli le róluk a nyomásra induló hullámot. */
   function renderTabs(){
-    const t = $('tabs'); t.innerHTML = '';
-    Object.entries(MENU).forEach(([id,c]) => {
-      const b = document.createElement('button'); b.textContent = c.label;
-      b.className = id===active ? 'on' : '';
-      b.onclick = () => { active = id; renderTabs(); renderContent(); };
-      t.appendChild(b);
+    const t = $('tabs');
+    if (!t.children.length){
+      Object.entries(MENU).forEach(([id,c]) => {
+        const b = document.createElement('button');
+        b.textContent = c.label;
+        b.dataset.tab = id;
+        b.onclick = () => { if (active === id) return; active = id; renderTabs(); renderContent(); };
+        t.appendChild(b);
+      });
+    }
+    [...t.children].forEach(b => {
+      const on = b.dataset.tab === active;
+      if (on && !b.classList.contains('on')){
+        b.classList.add('on');
+        b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';
+      } else if (!on){
+        b.classList.remove('on');
+      }
     });
   }
   function renderContent(slide){
@@ -820,9 +885,11 @@
   document.addEventListener('click', e => {
     const btn = e.target.closest('[data-add]');
     if (!btn) return;
-    const id = btn.dataset.add;
+    const id = btn.dataset.add, card = btn.closest('.item');
     cart[id] = (cart[id]||0) + 1;
-    flyToCart(btn.closest('.item').querySelector('.ph'));
+    const pr = card.querySelector('.pr');
+    if (pr){ pr.classList.remove('hit'); void pr.offsetWidth; pr.classList.add('hit'); }
+    flyToCart(card.querySelector('.ph'));
     setTimeout(() => syncCart(true), 480);
     btn.classList.add('ok');
     btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 5 5L20 7"/></svg>';
@@ -912,12 +979,16 @@
   }
   $('cartList').addEventListener('click', e => {
     const inc = e.target.closest('[data-inc]'), dec = e.target.closest('[data-dec]');
-    if (inc){ cart[inc.dataset.inc]++; }
+    let id;
+    if (inc){ id = inc.dataset.inc; cart[id]++; }
     else if (dec){
-      const id = dec.dataset.dec;
+      id = dec.dataset.dec;
       if (--cart[id] <= 0) delete cart[id];
     } else return;
     syncCart(false); renderCartSheet();
+    /* a megváltozott darabszám felugrik */
+    const b = $('cartList').querySelector('[data-inc="'+id+'"]')?.previousElementSibling;
+    if (b) b.classList.add('bump');
   });
 
   const openCart = () => { renderCartSheet(); show('cartSheet'); };
@@ -1219,10 +1290,45 @@
   /* ---------- init ---------- */
   renderTabs(); renderContent(); syncCart(false); syncOrdCnt(); syncWallet();
 
-  /* PWA: telepíthetőség + offline tartalék */
+  /* ---------- PWA: telepítés a kezdőképernyőre ---------- */
   if ('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js', { scope:'/' }).catch(() => {});
   }
+
+  const installed = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  let installEvt = null;
+
+  /* Androidon/Chrome-on saját gombbal kínáljuk fel a telepítést. */
+  addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installEvt = e;
+    $('miInstall').hidden = false;
+  });
+  /* iOS-en nincs ilyen esemény, ott a Megosztás menün át megy — mutassuk meg, hogyan. */
+  if (isIOS && !installed) $('miInstall').hidden = false;
+  addEventListener('appinstalled', () => { installEvt = null; $('miInstall').hidden = true; });
+
+  $('miInstall').onclick = fromMenu(async () => {
+    if (installEvt){
+      installEvt.prompt();
+      const r = await installEvt.userChoice.catch(() => null);
+      installEvt = null;
+      if (r && r.outcome === 'accepted') $('miInstall').hidden = true;
+      return;
+    }
+    const c = $('confirm');
+    c.innerHTML =
+      '<svg class="ck" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M14 27l8 8 16-16"/></svg>'+
+      '<h2>Tedd ki a telefonodra</h2>'+
+      '<span class="meta">Pepper · irodai rendelés</span>'+
+      '<p>Koppints a böngésző alján a <b>Megosztás</b> ikonra, majd válaszd a <b>Főképernyőhöz adás</b> lehetőséget. '+
+      'Innentől önálló appként nyílik, böngészősáv nélkül.</p>'+
+      '<div class="cta"><button class="pri" id="cfOk">Értem</button></div>';
+    c.classList.add('show');
+    $('cfOk').onclick = () => c.classList.remove('show');
+  });
 
   window.addEventListener('load', () => {
     const dqr = $('dqr');
