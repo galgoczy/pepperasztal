@@ -226,24 +226,55 @@
   /* ---------- SPLASH ---------- */
   /* fixed, hogy mobilon a képernyőt fedje (a .phone a teljes görgethető tartalom magas) */
   .splash{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;overflow:hidden;
-    background:radial-gradient(circle at 50% 36%,#F5514B 0%,#E52721 42%,#B2140F 100%);
-    animation:splashOut .5s 1.85s var(--ease-out) forwards}
+    background:radial-gradient(circle at 50% 44%,#F5514B 0%,#E52721 46%,#A8120D 100%);
+    animation:splashOut .55s 2.05s var(--ease-out) forwards}
   .splash::after{content:"";position:absolute;inset:0;pointer-events:none;
-    background:radial-gradient(circle at 50% 38%,transparent 42%,rgba(84,7,5,.5) 100%)}
+    background:radial-gradient(circle at 50% 44%,transparent 46%,rgba(78,6,4,.55) 100%)}
   @keyframes splashOut{to{opacity:0;visibility:hidden}}
-  .splashLogo{position:relative;width:min(62%,228px);animation:logoIn .75s var(--ease-out) both}
+
+  /* meleg fény dagad fel a logó mögött */
+  .sGlow{position:absolute;width:148%;aspect-ratio:1;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle,rgba(255,216,128,.46) 0%,rgba(255,124,58,.2) 34%,transparent 66%);
+    animation:glowUp 2.3s var(--ease-out) both}
+  @keyframes glowUp{0%{transform:scale(.4);opacity:0}45%{opacity:1}100%{transform:scale(1.08);opacity:.6}}
+
+  /* két kifutó gyűrű, mint egy lökethullám */
+  .sRing{position:absolute;width:190px;height:190px;border-radius:50%;pointer-events:none;
+    border:1.5px solid rgba(255,255,255,.45);animation:ringOut 1.9s .55s cubic-bezier(.16,1,.3,1) both}
+  .sRing.r2{animation-delay:1s}
+  @keyframes ringOut{0%{transform:scale(.45);opacity:0}22%{opacity:.5}100%{transform:scale(2.7);opacity:0}}
+
+  /* a logó enyhe túllendüléssel érkezik, majd végigfut rajta a fénycsík */
+  .splashLogo{position:relative;width:min(62%,228px);animation:logoPop .85s .1s cubic-bezier(.34,1.5,.64,1) both}
   .splashLogo img{width:100%;display:block}
-  /* a fénycsík a logó alakjára maszkolva fut végig */
+  @keyframes logoPop{from{opacity:0;transform:scale(.74)}to{opacity:1;transform:scale(1)}}
   .splashLogo .shine{position:absolute;inset:0;pointer-events:none;
     -webkit-mask-image:url(../../assets/pepperhouse-logo-inverse.png);mask-image:url(../../assets/pepperhouse-logo-inverse.png);
     -webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
     background:linear-gradient(100deg,transparent 40%,rgba(255,255,255,.95) 50%,transparent 60%);
     background-size:250% 100%;background-repeat:no-repeat;
-    animation:shine 1.15s .4s var(--ease-standard) both}
-  @keyframes logoIn{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:none}}
+    animation:shine 1.2s .62s var(--ease-standard) both}
   @keyframes shine{from{background-position:-80% 0}to{background-position:170% 0}}
-  .splashTag{position:absolute;left:0;right:0;bottom:13%;text-align:center;color:rgba(255,255,255,.82);
-    font-size:10.5px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;animation:logoIn .6s .55s both}
+
+  /* a felirat betűköze kinyílik, ahogy előtűnik */
+  .splashTag{position:absolute;left:0;right:0;bottom:14%;text-align:center;color:#fff;
+    font-size:10.5px;font-weight:600;text-transform:uppercase;animation:tagIn .95s .8s var(--ease-out) both}
+  @keyframes tagIn{from{opacity:0;letter-spacing:.1em}to{opacity:.88;letter-spacing:.34em}}
+
+  /* ---------- FŐOLDAL BEÚSZÁSA ---------- */
+  @keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes growIn{from{opacity:0;transform:translateY(16px) scale(.94)}to{opacity:1;transform:none}}
+  @keyframes riseUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+  .app.enter>header.bar{animation:riseIn .5s var(--ease-out) both}
+  .app.enter .hero .eb{animation:riseIn .5s .08s var(--ease-out) both}
+  .app.enter .hero h1{animation:riseIn .55s .15s var(--ease-out) both}
+  .app.enter .hero p{animation:riseIn .55s .21s var(--ease-out) both}
+  .app.enter .banner{animation:growIn .6s .29s var(--ease-out) both}
+  .app.enter>nav.tabs{animation:riseIn .5s .4s var(--ease-out) both}
+  /* a kártyák egymás után nőnek a helyükre (--i a sorszámuk) */
+  .app.enter main>.gt,.app.enter main>.dayrow,.app.enter main>.item,.app.enter main>.empty{
+    animation:growIn .5s calc(.46s + var(--i,0)*.055s) var(--ease-out) both}
+  .app.enter .cartbar{animation:riseUp .5s .34s var(--ease-out) both}
 
   /* ---------- HETI BANNER ---------- */
   .banner{position:relative;display:block;width:100%;overflow:hidden;margin:14px 0 0;padding:15px 16px 16px;
@@ -251,6 +282,13 @@
     background:linear-gradient(115deg,#A8120D 0%,#E52721 46%,#F0821E 100%);box-shadow:0 10px 24px rgba(168,18,13,.26)}
   .banner::before{content:"";position:absolute;inset:0;opacity:.15;pointer-events:none;
     background:repeating-linear-gradient(115deg,#fff 0 10px,transparent 10px 24px)}
+  /* Fotós változat: csak akkor kapcsol be, ha a háttérkép tényleg betöltődött,
+     így hiányzó fájl esetén a színátmenetes verzió marad. */
+  .banner.photo{background:#180806 center right/cover no-repeat url(../../assets/mexikoi-het.jpg)}
+  .banner.photo::before{opacity:1;
+    background:linear-gradient(100deg,rgba(18,5,3,.94) 0%,rgba(18,5,3,.82) 38%,rgba(18,5,3,.34) 72%,rgba(18,5,3,.12) 100%)}
+  .banner.photo .bTag{background:rgba(255,255,255,.18);backdrop-filter:blur(2px)}
+  .banner.photo .bSub{max-width:78%}
   .banner>*{position:relative}
   .banner .bTag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
     background:rgba(255,255,255,.24);padding:4px 9px;border-radius:999px}
@@ -302,6 +340,12 @@
   .card .cunit{font-size:11.5px;font-weight:300;color:var(--text-muted);margin-top:2px}
   .card .bc{margin-top:16px}
   .card .bc svg{width:100%;height:auto;display:block}
+  .card .bal{display:flex;align-items:center;gap:10px;margin-top:15px;padding-top:13px;
+    border-top:1px solid var(--border-subtle);text-align:left}
+  .card .bal .bll{font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+  .card .bal .blb{margin-left:auto;display:inline-flex;align-items:center;gap:9px;background:none;border:none;cursor:pointer;
+    padding:2px 0;font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--text-strong)}
+  .card .bal .blb .dots{letter-spacing:.2em;font-size:20px;line-height:1}
   .hint{display:flex;gap:9px;align-items:flex-start;margin-top:14px;font-size:12px;font-weight:300;line-height:1.5;color:var(--text-muted)}
   .hint svg{flex:none;margin-top:2px}
 
@@ -372,7 +416,10 @@
 
     <!-- Indítóképernyő: a logón végigfut egy fénycsík, majd felúszik a fejlécbe -->
     <div class="splash" id="splash">
-      <div class="splashLogo" id="splashLogo">
+      <span class="sGlow"></span>
+      <span class="sRing"></span>
+      <span class="sRing r2"></span>
+      <div class="splashLogo">
         <img src="../../assets/pepperhouse-logo-inverse.png" alt="Pepper House">
         <span class="shine"></span>
       </div>
@@ -632,13 +679,14 @@
       return;
     }
     m.className = '';
+    let n = 0; // sorszám a lépcsőzetes beúszáshoz
     m.innerHTML = groups.map((g, i) => {
       const head = (c.days && i === 0)
-        ? '<div class="dayrow"><h3 class="gt">'+g.title+(day==='holnap' ? ' — holnap' : '')+'</h3>'+
+        ? '<div class="dayrow" style="--i:'+(n++)+'"><h3 class="gt">'+g.title+(day==='holnap' ? ' — holnap' : '')+'</h3>'+
           '<button class="daybtn" id="dayBtn">'+(day==='ma' ? 'Holnapi '+arrR : arrL+' Mai')+'</button></div>'
-        : '<h3 class="gt">'+g.title+'</h3>';
+        : '<h3 class="gt" style="--i:'+(n++)+'">'+g.title+'</h3>';
       return head + g.items.map(it =>
-        '<article class="item">'+
+        '<article class="item" style="--i:'+(n++)+'">'+
           '<img class="ph" loading="lazy" src="'+it.img+'" alt="'+esc(it.name)+'" onerror="this.onerror=null;this.src=FALLBACK">'+
           '<div class="mid"><span class="nm">'+esc(it.name)+'</span><span class="ds">'+esc(it.desc)+'</span>'+
           '<span class="pr">'+ft(it.price)+
@@ -914,17 +962,43 @@
       'font-family="ui-monospace,SFMono-Regular,Menlo,monospace" letter-spacing="1">'+bars+txt+'</svg>';
   }
 
+  /* Az egyenleg alapból rejtve van; a lap minden megnyitásakor újra elrejtjük. */
+  let balShown = false;
+  const EYE_ON  = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+  const EYE_OFF = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"/><path d="M9.6 6.1A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.4 8.3A17 17 0 0 0 2.5 12S6 18.5 12 18.5a9.4 9.4 0 0 0 3.2-.55"/><path d="M10.1 10.2a2.8 2.8 0 0 0 3.8 3.9"/></svg>';
+
+  function paintBalance(){
+    const v = $('balVal'), b = $('balEye');
+    if (!v) return;
+    v.innerHTML = balShown ? ft(balance) : '<span class="dots">••••••</span>';
+    b.innerHTML = balShown ? EYE_OFF : EYE_ON;
+    $('balToggle').setAttribute('aria-label', balShown ? 'Egyenleg elrejtése' : 'Egyenleg megjelenítése');
+  }
+
   function renderCodeSheet(){
+    balShown = false;
     $('codeBody').innerHTML =
       '<div class="card">'+
         '<div class="cname">'+esc(MEMBER.name)+'</div>'+
         '<div class="cunit">'+esc(MEMBER.unit)+' egység · Pepper House törzskártya</div>'+
         '<div class="bc">'+eanSvg(EAN13)+'</div>'+
+        '<div class="bal">'+
+          '<span class="bll">Egyenleg</span>'+
+          '<button class="blb" id="balToggle"><span id="balVal"></span><span id="balEye"></span></button>'+
+        '</div>'+
       '</div>'+
+      '<button class="mbtn pri" id="codeTopup" style="margin-top:14px">'+
+        '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'+
+        '<span><span class="mt2">Egyenleg feltöltése</span><span class="md">Kártyával, vagy készpénzzel a kasszánál +5%</span></span>'+
+      '</button>'+
       '<div class="hint">'+
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ph-red)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.6"/></svg>'+
         '<span>Mutasd be a kasszánál: beolvasás után használhatod az egyenleged és a kedvezményed. Tekerd fel a képernyő fényerejét, úgy gyorsabban olvassa.</span>'+
       '</div>';
+
+    paintBalance();
+    $('balToggle').onclick = () => { balShown = !balShown; paintBalance(); };
+    $('codeTopup').onclick = () => { renderTopSheet(); show('topSheet'); };
   }
 
   /* ---------- feltöltés ---------- */
@@ -1036,6 +1110,13 @@
   $('codeBtn').onclick = () => { renderCodeSheet(); show('codeSheet'); };
   $('banner').onclick  = () => { renderLoySheet(); show('loySheet'); };
 
+  /* A heti banner fotós háttere: csak sikeres betöltés után kapcsoljuk be. */
+  (function bannerPhoto(){
+    const src = '../../assets/mexikoi-het.jpg', im = new Image();
+    im.onload = () => $('banner').classList.add('photo');
+    im.src = src;
+  })();
+
   /* ---------- toast ---------- */
   let toastT;
   function toast(msg){
@@ -1047,28 +1128,15 @@
 
   /* ---------- indítóképernyő ---------- */
   (function splashRun(){
-    const sp = $('splash'), lg = $('splashLogo');
+    const sp = $('splash'), app = document.querySelector('.app');
     if (!sp) return;
-    const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
-    if (reduce){ sp.remove(); return; }
+    if (matchMedia('(prefers-reduced-motion:reduce)').matches){ sp.remove(); return; }
 
-    /* A logó a fénycsík után felúszik a fejlécbeli helyére. */
-    setTimeout(() => {
-      const dest = document.querySelector('header.bar .logo');
-      if (dest && lg){
-        const a = lg.getBoundingClientRect(), b = dest.getBoundingClientRect();
-        if (b.width){
-          lg.animate([
-            { transform:'none', opacity:1 },
-            { transform:'translate('+(b.left + b.width/2 - a.left - a.width/2)+'px,'+
-                                     (b.top + b.height/2 - a.top - a.height/2)+'px) scale('+(b.width/a.width)+')',
-              opacity:0 },
-          ], { duration:620, easing:'cubic-bezier(.16,1,.3,1)', fill:'forwards' });
-        }
-      }
-    }, 1500);
-
-    setTimeout(() => sp.remove(), 2500);
+    /* Ahogy a splash oldódni kezd, a főoldal elemei a helyükre nőnek. */
+    setTimeout(() => app.classList.add('enter'), 2000);
+    setTimeout(() => sp.remove(), 2700);
+    /* Az osztály lekerül, hogy a későbbi lapváltások ne animáljanak újra. */
+    setTimeout(() => app.classList.remove('enter'), 4400);
   })();
 
   /* ---------- init ---------- */
