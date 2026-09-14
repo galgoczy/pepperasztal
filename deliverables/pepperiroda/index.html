@@ -308,10 +308,6 @@
   .splashLogo img{width:100%;display:block}
   @keyframes logoFade{from{opacity:0}to{opacity:1}}
   @keyframes logoRush{0%{transform:scale(1);filter:blur(0)}100%{transform:scale(7);opacity:0;filter:blur(7px)}}
-  .splashTag{position:absolute;left:0;right:0;bottom:14%;text-align:center;color:#fff;font-size:10.5px;font-weight:600;
-    text-transform:uppercase;animation:tagIn .8s .5s var(--ease-out) both,tagOut .3s 1.45s var(--ease-out) both}
-  @keyframes tagIn{from{opacity:0;letter-spacing:.1em}to{opacity:.88;letter-spacing:.34em}}
-  @keyframes tagOut{to{opacity:0;transform:translateY(6px)}}
 
   /* belépő animáció */
   @keyframes riseUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
@@ -513,7 +509,6 @@
     <div class="splash" id="splash">
       <span class="sGlow"></span>
       <div class="splashLogo"><img src="../../assets/pepperhouse-logo-inverse.png" alt="Pepper House"></div>
-      <div class="splashTag">Irodai rendelés</div>
     </div>
 
     <div class="app">
@@ -761,8 +756,8 @@
       if (r.bottom < -60 || r.top > vh + 60){ if (el.style.transform){ el.style.transform=''; el.style.zIndex=''; } return; }
       const d = Math.min(1, Math.abs(r.top + r.height/2 - band) / reach);
       const t = 1 - d, e = t * t * (3 - 2 * t);
-      /* a nagyobb aloldali kártyák visszafogottabban nőnek, mint az étlap tételei */
-      const amp = el.classList.contains('item') ? .09 : .04;
+      /* a nagyobb aloldali kártyák valamivel visszafogottabban nőnek, mint az étlap tételei */
+      const amp = el.classList.contains('item') ? .09 : .065;
       el.style.transform = 'scale(' + (1 + e * amp).toFixed(4) + ')';
       el.style.zIndex = e > .45 ? '2' : '';
     });
@@ -1428,7 +1423,7 @@
   addEventListener('load', () => {
     const dqr = $('dqr');
     if (typeof QRCode !== 'undefined' && dqr){
-      new QRCode(dqr, { text:'https://pepperasztal.vercel.app/iroda', width:88, height:88,
+      new QRCode(dqr, { text:'https://pepperasztal.vercel.app/', width:88, height:88,
         colorDark:'#141414', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.M });
     } else if (dqr){
       dqr.innerHTML = '<svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#141414" stroke-width="1.5"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM14 19v2M21 14h-2"/></svg>';

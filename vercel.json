@@ -1,7 +1,10 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/deliverables/pepperasztal/index.html" },
-    { "source": "/iroda", "destination": "/deliverables/pepperiroda/index.html" }
+    { "source": "/", "destination": "/deliverables/pepperiroda/index.html" },
+    { "source": "/asztal", "destination": "/deliverables/pepperasztal/index.html" }
+  ],
+  "redirects": [
+    { "source": "/iroda", "destination": "/", "permanent": false }
   ],
   "headers": [
     {
