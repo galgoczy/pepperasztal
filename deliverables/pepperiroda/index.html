@@ -42,7 +42,9 @@
   @keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.55)}100%{transform:scale(1)}}
 
   /* ---------- OLDALAK ---------- */
-  main{flex:1;min-height:0}
+  /* clip, nem hidden: nem hoz létre görgetőt, így a ragadós fülek megmaradnak,
+     de a kiemelésre felnagyított kártya nem tol ki vízszintes csúszkát */
+  main{flex:1;min-height:0;overflow-x:clip}
   .page{padding:14px 16px 26px}
   .page.plain{padding-top:16px}
   .ptitle{font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:-.01em;margin:2px 0 14px}
@@ -62,6 +64,14 @@
   .balcard .bv{display:block;font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1.15;margin-top:1px}
   .balcard .badd{margin-left:auto;flex:none;border:none;cursor:pointer;background:var(--ph-red);color:#fff;
     padding:10px 15px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:var(--shadow-red)}
+  .balcard .bmeta{margin-left:auto;flex:none;text-align:right;font-size:10.5px;font-weight:600;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--text-muted);line-height:1.3}
+  .balcard .bmeta b{display:block;font-family:var(--font-display);font-size:14px;font-weight:700;letter-spacing:0;
+    text-transform:none;color:var(--text-body);margin-top:2px}
+  /* feltöltés gomb a színes egyenleg-kártyán */
+  .ptcard .ghost{margin-top:14px;padding:11px 18px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;
+    background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.4);color:#fff;backdrop-filter:blur(2px)}
+  .ptcard .ghost:active{transform:scale(.96)}
 
   .ptcard{position:relative;overflow:hidden;border-radius:16px;padding:16px 18px 18px;margin-bottom:12px;color:#fff;
     background:linear-gradient(115deg,#C81E19 0%,#E52721 58%,#F0561E 100%);box-shadow:0 10px 24px rgba(200,30,25,.28)}
@@ -180,7 +190,7 @@
   .rv{opacity:0;transform:translateY(20px) scale(.95)}
   .rv.rv-in{animation:growIn .55s var(--ease-out) both}
   .no-rv .rv{opacity:1;transform:none}
-  .item.focusable{animation:none;opacity:1;transform:none;will-change:transform;transition:transform .34s cubic-bezier(.22,1,.36,1)}
+  .focusable{animation:none;opacity:1;transform:none;will-change:transform;transition:transform .34s cubic-bezier(.22,1,.36,1)}
 
   /* ---------- AJÁNLATOK ---------- */
   .promo{position:relative;border-radius:16px;overflow:hidden;margin-bottom:14px;color:#fff;min-height:168px;
@@ -256,7 +266,7 @@
     color:var(--ph-red);font-weight:600;font-size:14px;cursor:pointer}
 
   /* ---------- ALSÓ SÁVOK ---------- */
-  .cartbar{position:sticky;bottom:calc(62px + env(safe-area-inset-bottom));z-index:12;display:flex;justify-content:flex-end;
+  .cartbar{position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));z-index:12;display:flex;justify-content:flex-end;
     align-items:center;gap:10px;padding:10px 16px;pointer-events:none}
   .cartbar>*{pointer-events:auto}
   .orderbtn{flex:none;font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
@@ -269,8 +279,8 @@
 
   .bnav{position:sticky;bottom:0;z-index:13;display:flex;background:#fff;border-top:1px solid var(--border-subtle);
     padding-bottom:env(safe-area-inset-bottom)}
-  .bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px 8px;background:none;
-    border:none;cursor:pointer;color:var(--text-muted);font-size:10.5px;font-weight:600}
+  .bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 4px 11px;background:none;
+    border:none;cursor:pointer;color:var(--text-muted);font-size:12px;font-weight:600}
   .bnav button.on{color:var(--ph-red)}
   .bnav button svg{transition:transform .22s var(--ease-out)}
   .bnav button.on svg{transform:translateY(-1px) scale(1.08)}
@@ -429,9 +439,9 @@
 
   /* ---------- MIKROANIMÁCIÓK ---------- */
   nav.tabs button,.item .add,.paybtn,.mbtn,.amts button,.rw .rb,.daybtn,.orderbtn,.codebtn,.sheet .sh .x,
-  .cl .qty button,.topcta,.banner,.tile,.bnav button,.lnk,.logout,.balcard .badd,.promo{overflow:hidden}
+  .cl .qty button,.topcta,.banner,.tile,.bnav button,.lnk,.logout,.balcard .badd,.ptcard .ghost{overflow:hidden}
   nav.tabs button,.paybtn,.mbtn,.amts button,.rw .rb,.daybtn,.orderbtn,.codebtn,.sheet .sh .x,
-  .cl .qty button,.tile,.bnav button,.lnk,.logout,.balcard .badd{position:relative}
+  .cl .qty button,.tile,.bnav button,.lnk,.logout,.balcard .badd,.ptcard .ghost{position:relative}
   .rw-ink{position:absolute;border-radius:50%;background:currentColor;opacity:.28;pointer-events:none;transform:scale(0);
     animation:inkOut .6s var(--ease-out) forwards}
   @keyframes inkOut{to{transform:scale(1);opacity:0}}
@@ -694,7 +704,7 @@
 
   /* ---------- hullám-effekt a gombnyomásokra ---------- */
   const INK = 'nav.tabs button,.item .add,.paybtn,.mbtn,.amts button,.rw .rb,.daybtn,.orderbtn,.codebtn,' +
-              '.sheet .sh .x,.cl .qty button,.topcta,.banner,.tile,.bnav button,.lnk,.logout,.balcard .badd,.promo';
+              '.sheet .sh .x,.cl .qty button,.topcta,.banner,.tile,.bnav button,.lnk,.logout,.balcard .badd,.ptcard .ghost';
   document.addEventListener('pointerdown', e => {
     const b = e.target.closest(INK);
     if (!b || matchMedia('(prefers-reduced-motion:reduce)').matches) return;
@@ -709,6 +719,8 @@
   }, { passive:true });
 
   /* ---------- görgetésre beúszás + kiemelés ---------- */
+  /* A kiemelés minden aloldal kártyáira vonatkozik, nem csak az étlapéira. */
+  const FOCUSABLE = '.item,.card2,.ptcard,.balcard,.promo,.tiles';
   let io = null, focusItems = [];
   function observeNew(){ if (io) document.querySelectorAll('.rv:not(.rv-in)').forEach(el => io.observe(el)); }
   function resetReveal(){ focusItems = []; observeNew(); }
@@ -721,10 +733,10 @@
         e.target.style.animationDelay = (k++ * 70) + 'ms';
         e.target.classList.add('rv-in');
         obs.unobserve(e.target);
-        if (e.target.classList.contains('item')){
+        if (e.target.matches(FOCUSABLE)){
           e.target.addEventListener('animationend', () => {
             e.target.classList.add('focusable');
-            focusItems = [...document.querySelectorAll('.item.focusable')];
+            focusItems = [...document.querySelectorAll('.focusable')];
             onScroll();
           }, { once:true });
         }
@@ -742,7 +754,9 @@
       if (r.bottom < -60 || r.top > vh + 60){ if (el.style.transform){ el.style.transform=''; el.style.zIndex=''; } return; }
       const d = Math.min(1, Math.abs(r.top + r.height/2 - band) / reach);
       const t = 1 - d, e = t * t * (3 - 2 * t);
-      el.style.transform = 'scale(' + (1 + e * .09).toFixed(4) + ')';
+      /* a nagyobb aloldali kártyák visszafogottabban nőnek, mint az étlap tételei */
+      const amp = el.classList.contains('item') ? .09 : .04;
+      el.style.transform = 'scale(' + (1 + e * amp).toFixed(4) + ')';
       el.style.zIndex = e > .45 ? '2' : '';
     });
   }
@@ -763,7 +777,7 @@
       PAGES.forEach(p => {
         const b = document.createElement('button');
         b.dataset.page = p.id;
-        b.innerHTML = svg(p.icon, 21) + '<span>' + p.label + '</span>';
+        b.innerHTML = svg(p.icon, 24) + '<span>' + p.label + '</span>';
         b.onclick = () => setPage(p.id);
         n.appendChild(b);
       });
@@ -881,17 +895,20 @@
 
     $('screen').innerHTML =
       '<div class="page">'+
-        '<div class="balcard rv">'+
-          '<span class="bi">'+svg(ICO.wallet,20)+'</span>'+
-          '<span><span class="bl">Egyenleged</span><span class="bv">'+ft(balance)+'</span></span>'+
-          '<button class="badd" id="fTop">Feltöltés</button>'+
+        '<div class="ptcard rv">'+
+          '<span class="star"><svg width="62" height="62" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3"/><rect x="3" y="7.5" width="18" height="12" rx="2.5"/><circle cx="17" cy="13.5" r="1.3"/></svg></span>'+
+          '<div class="pl">Egyenleged</div>'+
+          '<div class="pv">'+ft(balance)+'</div>'+
+          '<div class="ps">'+(isMember()
+            ? 'Törzskártyás · 5% kedvezmény minden rendelésre'
+            : 'Tölts fel, és 5% kedvezményt kapsz minden rendelésre')+'</div>'+
+          '<button class="ghost" id="fTop">Feltöltés</button>'+
         '</div>'+
 
-        '<div class="ptcard rv">'+
-          '<span class="star"><svg width="60" height="60" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="m12 3.6 2.5 5.1 5.6.8-4 4 .95 5.6L12 16.5l-5 2.6.95-5.6-4-4 5.6-.8Z"/></svg></span>'+
-          '<div class="pl">Aktuális pontszám</div>'+
-          '<div class="pv">'+points+'</div>'+
-          '<div class="ps">Összesen gyűjtve: '+lifetime+' pont</div>'+
+        '<div class="balcard rv">'+
+          '<span class="bi" style="color:var(--ph-red)">'+svg(ICO.star,20)+'</span>'+
+          '<span><span class="bl">Pontjaid</span><span class="bv">'+points+'</span></span>'+
+          '<span class="bmeta">Összesen gyűjtve<b>'+lifetime+' pont</b></span>'+
         '</div>'+
 
         '<div class="card2 rv">'+
