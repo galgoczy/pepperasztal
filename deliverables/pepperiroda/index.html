@@ -61,11 +61,22 @@
   .cartbtn .badge.pulse{animation:pulse .45s var(--ease-out)}
   @keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.55)}100%{transform:scale(1)}}
 
-  .hero{background:#fff;padding:16px 16px 18px;border-bottom:1px solid var(--border-subtle)}
-  .hero .eb{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--ph-red)}
-  .hero .eb::before{content:"";width:20px;height:2px;background:var(--ph-red)}
-  .hero h1{font-family:var(--font-display);font-weight:700;font-size:23px;line-height:1.15;letter-spacing:-.01em;margin:9px 0 0}
-  .hero p{font-weight:300;font-size:13.5px;line-height:1.55;color:var(--text-muted);margin:7px 0 0}
+  .hero{background:#fff;padding:14px 16px 16px;border-bottom:1px solid var(--border-subtle)}
+  .hero h1{font-family:var(--font-display);font-weight:700;font-size:23px;line-height:1.15;letter-spacing:-.01em;margin:16px 0 0}
+
+  /* felső figyelemfelhívó gomb: a fénycsík időnként végigfut rajta */
+  .topcta{position:relative;overflow:hidden;display:flex;align-items:center;gap:10px;width:100%;border:none;cursor:pointer;
+    padding:11px 14px;border-radius:12px;color:#fff;text-align:left;
+    background:linear-gradient(100deg,#C81E19 0%,#E52721 52%,#F0561E 100%);box-shadow:0 6px 16px rgba(200,30,25,.3)}
+  .topcta::after{content:"";position:absolute;top:0;bottom:0;width:38%;pointer-events:none;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.32),transparent);
+    animation:ctaShine 3.6s 1.4s ease-in-out infinite}
+  @keyframes ctaShine{0%{left:-45%}45%{left:115%}100%{left:115%}}
+  .topcta .tci{flex:none;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;
+    background:rgba(255,255,255,.2)}
+  .topcta .tct{flex:1;font-weight:600;font-size:14px;letter-spacing:.01em}
+  .topcta .tca{flex:none;opacity:.9}
+  .topcta:active{transform:scale(.985)}
 
   nav.tabs{position:sticky;top:67px;z-index:9;background:var(--ph-gray-050);display:flex;gap:8px;overflow-x:auto;
     padding:14px 16px;scrollbar-width:none}
@@ -111,17 +122,19 @@
   .empty .soon{display:inline-block;margin-top:18px;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
     color:var(--ph-red-700);background:var(--ph-red-050);padding:7px 14px;border-radius:999px}
 
-  .cartbar{position:sticky;bottom:0;z-index:10;background:#fff;border-top:1px solid var(--border-subtle);
-    padding:14px 16px calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px}
-  .cartbar .info{display:flex;flex-direction:column;min-width:0}
-  .cartbar .info .t{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .cartbar .info .s{font-size:12px;color:var(--text-muted);font-weight:300}
-  .cartbar .acts{margin-left:auto;flex:none;display:flex;align-items:center;gap:8px}
-  .orderbtn{flex:none;font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;
-    padding:13px 18px;border-radius:999px;border:none;background:var(--ph-red);color:#fff;cursor:pointer;transition:opacity .25s}
-  .orderbtn[disabled]{opacity:.4;pointer-events:none}
-  .codebtn{width:44px;height:44px;flex:none;border-radius:999px;border:1.5px solid var(--border-default);background:#fff;
-    display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s}
+  /* lebegő műveletsor: nincs csík, a gombok a jobb alsó sarokban ülnek */
+  .cartbar{position:sticky;bottom:0;z-index:10;display:flex;justify-content:flex-end;align-items:center;gap:10px;
+    padding:10px 16px calc(12px + env(safe-area-inset-bottom));pointer-events:none;
+    background:linear-gradient(transparent,var(--ph-gray-050) 58%)}
+  .cartbar>*{pointer-events:auto}
+  /* a megrendelés gomb csak akkor úszik be, ha van tétel a kosárban */
+  .orderbtn{flex:none;font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
+    padding:15px 20px;border-radius:999px;border:none;background:var(--ph-red);color:#fff;cursor:pointer;
+    box-shadow:var(--shadow-red);opacity:0;transform:translateY(10px) scale(.9);pointer-events:none;
+    transition:opacity .28s var(--ease-out),transform .28s var(--ease-out)}
+  .orderbtn.on{opacity:1;transform:none;pointer-events:auto}
+  .codebtn{width:54px;height:54px;flex:none;border-radius:999px;border:1.5px solid var(--border-default);background:#fff;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s;box-shadow:var(--shadow-md)}
   .codebtn:active{transform:scale(.92)}
 
   /* ---------- SCRIM + SHEETS ---------- */
@@ -266,15 +279,24 @@
   @keyframes growIn{from{opacity:0;transform:translateY(16px) scale(.94)}to{opacity:1;transform:none}}
   @keyframes riseUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
   .app.enter>header.bar{animation:riseIn .5s var(--ease-out) both}
-  .app.enter .hero .eb{animation:riseIn .5s .08s var(--ease-out) both}
-  .app.enter .hero h1{animation:riseIn .55s .15s var(--ease-out) both}
-  .app.enter .hero p{animation:riseIn .55s .21s var(--ease-out) both}
-  .app.enter .banner{animation:growIn .6s .29s var(--ease-out) both}
-  .app.enter>nav.tabs{animation:riseIn .5s .4s var(--ease-out) both}
-  /* a kártyák egymás után nőnek a helyükre (--i a sorszámuk) */
-  .app.enter main>.gt,.app.enter main>.dayrow,.app.enter main>.item,.app.enter main>.empty{
-    animation:growIn .5s calc(.46s + var(--i,0)*.055s) var(--ease-out) both}
-  .app.enter .cartbar{animation:riseUp .5s .34s var(--ease-out) both}
+  .app.enter .topcta{animation:growIn .5s .08s var(--ease-out) both}
+  .app.enter .banner{animation:growIn .6s .18s var(--ease-out) both}
+  .app.enter .hero h1{animation:riseIn .5s .3s var(--ease-out) both}
+  .app.enter>nav.tabs{animation:riseIn .5s .38s var(--ease-out) both}
+  .app.enter .cartbar{animation:riseUp .5s .3s var(--ease-out) both}
+
+  /* ---------- TARTALOM: GÖRGETÉSRE BEÚSZÁS ---------- */
+  /* Rejtve indul, és amikor a nézetbe ér, egymás után nő a helyére.
+     A .rv csak akkor kerül ki, ha a figyelő elindult, így script nélkül
+     is látható marad minden (lásd a .no-rv tartalékot). */
+  main>.rv{opacity:0;transform:translateY(20px) scale(.95)}
+  main>.rv.rv-in{animation:growIn .55s var(--ease-out) both}
+  .no-rv main>.rv{opacity:1;transform:none}
+
+  /* Görgetés közbeni kiemelés: a fókuszsávban lévő kártya kicsit megnő.
+     A JS csak a .focusable elemeken állít transformot, a beúszás után. */
+  /* Beúszás után a JS veszi át a transformot, ezért az animációt itt elengedjük. */
+  main>.item.focusable{animation:none;opacity:1;transform:none;transition:transform .15s var(--ease-standard)}
 
   /* ---------- HETI BANNER ---------- */
   .banner{position:relative;display:block;width:100%;overflow:hidden;margin:14px 0 0;padding:15px 16px 16px;
@@ -472,9 +494,11 @@
     </header>
 
     <section class="hero">
-      <span class="eb">Pepper House</span>
-      <h1>Ma nálunk ebédelsz?</h1>
-      <p>Böngészd végig a mai kínálatot, és rendelj közvetlenül az irodádból.</p>
+      <button class="topcta" id="topCta">
+        <span class="tci"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/></svg></span>
+        <span class="tct">Tölts fel a kedvezményekért!</span>
+        <svg class="tca" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+      </button>
 
       <button class="banner" id="banner">
         <span class="bTag">Heti ajánlat</span>
@@ -482,6 +506,8 @@
         <span class="bSub">Egész héten fűszeres fogásokkal várunk, a kiválasztott ételekre pedig dupla hűségpontot adunk.</span>
         <span class="bCta">Pontjaim megnézése →</span>
       </button>
+
+      <h1>Ma nálunk ebédelsz?</h1>
     </section>
 
     <nav class="tabs" id="tabs"></nav>
@@ -489,13 +515,10 @@
     <main id="content"></main>
 
     <div class="cartbar">
-      <div class="info"><span class="t" id="cbT">A kosarad üres</span><span class="s" id="cbS">Adj hozzá fogásokat a rendeléshez</span></div>
-      <div class="acts">
-        <button class="orderbtn" id="orderBtn" disabled>Megrendelem</button>
-        <button class="codebtn" id="codeBtn" aria-label="Kódom megjelenítése">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--ph-black)" stroke-width="1.7" stroke-linecap="round"><path d="M3 5v14M6.5 5v14M10 5v14M13.5 5v10M17 5v14M20.5 5v14"/></svg>
-        </button>
-      </div>
+      <button class="orderbtn" id="orderBtn">Megrendelem</button>
+      <button class="codebtn" id="codeBtn" aria-label="Kódom megjelenítése">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ph-black)" stroke-width="1.6" stroke-linecap="round"><path d="M3 5v14M6.5 5v14M10 5v14M13.5 5v10M17 5v14M20.5 5v14"/></svg>
+      </button>
     </div>
 
     <!-- Kosár / Rendeléseim lapok -->
@@ -658,6 +681,60 @@
   /* Törzskártyás az, akinek van feltöltött egyenlege. */
   const isMember = () => balance > 0;
 
+  /* ---------- görgetésre beúszás + kiemelés ---------- */
+  let io = null, focusItems = [];
+
+  function observeNew(){
+    if (io) document.querySelectorAll('main>.rv:not(.rv-in)').forEach(el => io.observe(el));
+  }
+  /* Új tartalom rendereléskor: a régi hivatkozások eldobása, újak figyelése. */
+  function resetReveal(){
+    focusItems = [];
+    observeNew();
+  }
+  function armReveal(){
+    if (io || !('IntersectionObserver' in window)) return;
+    io = new IntersectionObserver((entries, obs) => {
+      let k = 0;
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        /* egymás után, nem egyszerre */
+        e.target.style.animationDelay = (k++ * 70) + 'ms';
+        e.target.classList.add('rv-in');
+        obs.unobserve(e.target);
+        if (e.target.classList.contains('item')){
+          e.target.addEventListener('animationend', () => {
+            e.target.classList.add('focusable');
+            focusItems = [...document.querySelectorAll('main>.item.focusable')];
+            onScroll();
+          }, { once:true });
+        }
+      });
+    }, { threshold:.12, rootMargin:'0px 0px -6% 0px' });
+    observeNew();
+  }
+
+  /* A fókuszsávba érő kártya finoman megnő, majd ahogy továbbgörgetsz, visszahúzódik. */
+  let ticking = false;
+  function focusTick(){
+    ticking = false;
+    if (!focusItems.length) return;
+    const vh = innerHeight, band = vh * .46, reach = vh * .34;
+    focusItems.forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < -40 || r.top > vh + 40){ if (el.style.transform) el.style.transform = ''; return; }
+      const d = Math.min(1, Math.abs(r.top + r.height / 2 - band) / reach);
+      el.style.transform = 'scale(' + (1 + (1 - d) * .035).toFixed(4) + ')';
+    });
+  }
+  function onScroll(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(focusTick);
+  }
+  addEventListener('scroll', onScroll, { passive:true });
+  addEventListener('resize', onScroll);
+
   /* ---------- render: tabs + lista ---------- */
   function renderTabs(){
     const t = $('tabs'); t.innerHTML = '';
@@ -673,20 +750,20 @@
     const groups = c.days ? c.days[day].groups : c.groups;
     if (!groups.length){
       m.className = 'center';
-      m.innerHTML = '<div class="empty"><div class="ic">'+potIcon+'</div>'+
+      m.innerHTML = '<div class="empty rv"><div class="ic">'+potIcon+'</div>'+
         '<h2>Már készülnek '+c.empty.noun+'</h2><p>'+c.empty.text+'</p>'+
         '<span class="soon">Hamarosan</span></div>';
+      resetReveal();
       return;
     }
     m.className = '';
-    let n = 0; // sorszám a lépcsőzetes beúszáshoz
     m.innerHTML = groups.map((g, i) => {
       const head = (c.days && i === 0)
-        ? '<div class="dayrow" style="--i:'+(n++)+'"><h3 class="gt">'+g.title+(day==='holnap' ? ' — holnap' : '')+'</h3>'+
+        ? '<div class="dayrow rv"><h3 class="gt">'+g.title+(day==='holnap' ? ' — holnap' : '')+'</h3>'+
           '<button class="daybtn" id="dayBtn">'+(day==='ma' ? 'Holnapi '+arrR : arrL+' Mai')+'</button></div>'
-        : '<h3 class="gt" style="--i:'+(n++)+'">'+g.title+'</h3>';
+        : '<h3 class="gt rv">'+g.title+'</h3>';
       return head + g.items.map(it =>
-        '<article class="item" style="--i:'+(n++)+'">'+
+        '<article class="item rv">'+
           '<img class="ph" loading="lazy" src="'+it.img+'" alt="'+esc(it.name)+'" onerror="this.onerror=null;this.src=FALLBACK">'+
           '<div class="mid"><span class="nm">'+esc(it.name)+'</span><span class="ds">'+esc(it.desc)+'</span>'+
           '<span class="pr">'+ft(it.price)+
@@ -704,6 +781,7 @@
       day = day === 'ma' ? 'holnap' : 'ma';
       renderContent(dir);
     };
+    resetReveal();
     if (slide && !matchMedia('(prefers-reduced-motion:reduce)').matches){
       m.animate([{ opacity:0, transform:'translateX('+(slide*18)+'px)' },{ opacity:1, transform:'none' }],
         { duration:260, easing:'cubic-bezier(.16,1,.3,1)' });
@@ -718,18 +796,12 @@
   const cartPts = () => Object.entries(cart).reduce((a,[id,q]) => a + itemPts(ITEMS[id]) * q, 0);
 
   function syncCart(pulse){
-    const n = count(), badge = $('cartBadge');
+    const n = count(), badge = $('cartBadge'), ob = $('orderBtn');
     badge.textContent = n;
     if (pulse){ badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse'); }
-    if (n){
-      $('cbT').textContent = n + ' tétel a kosaradban';
-      $('cbS').textContent = 'Összesen ' + ft(grand());
-      $('orderBtn').disabled = false;
-    } else {
-      $('cbT').textContent = 'A kosarad üres';
-      $('cbS').textContent = 'Adj hozzá fogásokat a rendeléshez';
-      $('orderBtn').disabled = true;
-    }
+    /* A megrendelés gomb csak akkor úszik be, ha van tétel a kosárban. */
+    if (n) ob.textContent = 'Megrendelem · ' + ft(grand());
+    ob.classList.toggle('on', n > 0);
   }
 
   function flyToCart(imgEl){
@@ -1109,6 +1181,7 @@
 
   $('codeBtn').onclick = () => { renderCodeSheet(); show('codeSheet'); };
   $('banner').onclick  = () => { renderLoySheet(); show('loySheet'); };
+  $('topCta').onclick  = () => { renderTopSheet(); show('topSheet'); };
 
   /* A heti banner fotós háttere: csak sikeres betöltés után kapcsoljuk be. */
   (function bannerPhoto(){
@@ -1130,10 +1203,14 @@
   (function splashRun(){
     const sp = $('splash'), app = document.querySelector('.app');
     if (!sp) return;
-    if (matchMedia('(prefers-reduced-motion:reduce)').matches){ sp.remove(); return; }
+    if (matchMedia('(prefers-reduced-motion:reduce)') .matches || !('IntersectionObserver' in window)){
+      document.body.classList.add('no-rv');   // minden azonnal látszik
+      sp.remove();
+      return;
+    }
 
     /* Ahogy a splash oldódni kezd, a főoldal elemei a helyükre nőnek. */
-    setTimeout(() => app.classList.add('enter'), 2000);
+    setTimeout(() => { app.classList.add('enter'); armReveal(); }, 2000);
     setTimeout(() => sp.remove(), 2700);
     /* Az osztály lekerül, hogy a későbbi lapváltások ne animáljanak újra. */
     setTimeout(() => app.classList.remove('enter'), 4400);
