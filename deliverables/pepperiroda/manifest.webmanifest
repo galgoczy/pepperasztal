@@ -3,9 +3,13 @@
   "short_name": "Pepper",
   "description": "Rendelj közvetlenül az irodádból a Pepper House konyhájáról.",
   "lang": "hu",
+  "id": "/iroda",
   "start_url": "/iroda",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "categories": ["food", "business"],
   "background_color": "#F8F7F5",
   "theme_color": "#ffffff",
   "icons": [

@@ -2,5 +2,19 @@
   "rewrites": [
     { "source": "/", "destination": "/deliverables/pepperasztal/index.html" },
     { "source": "/iroda", "destination": "/deliverables/pepperiroda/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/deliverables/pepperiroda/manifest.webmanifest",
+      "headers": [{ "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Content-Type", "value": "application/javascript; charset=utf-8" },
+        { "key": "Service-Worker-Allowed", "value": "/" },
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    }
   ]
 }
