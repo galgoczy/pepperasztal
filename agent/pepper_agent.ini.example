@@ -1,0 +1,59 @@
+; =====================================================================
+; pepper_agent.ini.example
+; ---------------------------------------------------------------------
+; Masold at pepper_agent.ini neven a scriptek melle, es toltsd ki.
+; A pepper_agent.ini NEM kerul a gitbe (.gitignore) - jelszavak vannak benne.
+;
+; JELSZAVAK: nyilt "password =" helyett hasznalj "password_dpapi =" sort.
+; A DPAPI-blob gephez kotott: masik gepre masolva hasznalhatatlan.
+;   SYSDBA:        python setup_users.py titkosit
+;   PEPPER_* uj:   python setup_users.py jelszo
+; Ha mindketto szerepel, a password_dpapi nyer.
+;
+; A MAPPA JOGAI: ezt a mappat csak a Rendszergazdak es a SYSTEM olvashassa.
+; Lasd README, "1. Telepites".
+; =====================================================================
+
+[general]
+; A helyszin kulcsa, ekezet nelkul - a fajlnevekben es jelentesekben jelenik meg.
+helyszin = Knorr105
+
+[interbase]
+; Csak akkor kell, ha nem az alapertelmezett helyen van.
+; bin = C:\Program Files (x86)\Borland\InterBase\bin
+; db_path = C:\Program Files (x86)\novohost2\nhtouch\data\novohost.ib
+
+[sysdba]
+; A NovoHost meglevo SYSDBA jelszava. NEM valtoztatjuk meg.
+; Ezt csak a mentes (gbak) es a setup_users.py hasznalja.
+password_dpapi =
+
+[olvas]
+; Csak olvaso felhasznalo (setup_users.py hozza letre).
+user = PEPPER_OLVAS
+password_dpapi =
+; Ezeket a tablakat az olvaso felhasznalo sem latja (szemelyes adat).
+; kihagy = KARTYATULAJDONOS
+
+[vip]
+; A VIP-ugynok felhasznaloja: csak a kartya- es naplotablara ir.
+user = PEPPER_VIP
+password_dpapi =
+
+[backup]
+; Helyi mentesek. NE a Program Files ala (VirtualStore-csapda).
+mappa = C:\PepperAgent\mentesek
+
+; Masolat a gepen KIVUL - enelkul egy lemezhiba a mentest is viszi.
+; Lehet halozati megosztas vagy egy felhos szinkron mappa (OneDrive stb.).
+; masolat_mappa = \\NAS\pepper\mentesek\Knorr105
+
+; Megorzes: ennyi napi es ennyi heti mentes marad meg.
+napi_db = 7
+heti_db = 4
+
+; Titkositas (ajanlott, ha a masolat felhobe megy): 7-Zip, AES-256.
+; Az archiv-jelszot TAROLD A GEPEN KIVUL IS (jelszokezelo) - ha a gep
+; meghal, a DPAPI-blob vele hal, es a mentes nem lesz kibonthato.
+; sevenzip = C:\Program Files\7-Zip\7z.exe
+; password_dpapi =

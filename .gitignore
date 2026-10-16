@@ -1,0 +1,8 @@
+# Helyi ugynok: jelszavak, naplok, mentesek, jelentesek - soha a gitbe
+agent/pepper_agent.ini
+agent/*_log.txt
+agent/*allapot.json*
+agent/felderites_*.txt
+agent/mentesek/
+__pycache__/
+*.pyc
