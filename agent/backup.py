@@ -52,7 +52,7 @@ import tempfile
 import time
 import zipfile
 
-from common import (HERE, ConfigError, is_windows, load_config, log,
+from common import (AGENT_VERSION, HERE, ConfigError, is_windows, load_config, log,
                     parse_list, run_isql, run_tool, set_log)
 
 ALLAPOT = os.path.join(HERE, "mentes_allapot.json")
@@ -388,6 +388,7 @@ def main():
                     help="a probat akkor is engedi, ha ez POS gepnek latszik")
     args = ap.parse_args()
     set_log(os.path.join(HERE, "mentes_log.txt"))
+    log("backup - verzio {0}".format(AGENT_VERSION))
     cfg = load_config()
     try:
         if args.proba:

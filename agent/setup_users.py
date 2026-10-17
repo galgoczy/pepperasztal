@@ -41,7 +41,7 @@ import string
 import sys
 import time
 
-from common import (HERE, ConfigError, dpapi_protect, is_windows,
+from common import (AGENT_VERSION, HERE, ConfigError, dpapi_protect, is_windows,
                     load_config, log, parse_list, run_isql, run_tool,
                     set_log)
 
@@ -296,8 +296,13 @@ def gsec_preflight(cfg):
     log("   biztonsagi adatbazis: {0}".format(
         sec or "NEM TALALOM (a gsec a sajat alapertelmezeset hasznalja)"))
     rc, out, err = gsec(cfg, ["-display"])
-    if "user name" in out.lower() and not err.strip():
-        users = gsec_users(out)
+    # A listat kimenettol fuggetlenul keressuk: nem biztos, hogy minden
+    # gsec-verzio a stdout-ra irja. Hiba csak a valodi hibaszoveg.
+    both = out + "\n" + err
+    hiba = re.search(r"unavailable|not defined|unable|error|failed|denied",
+                     both, re.I)
+    if "user name" in both.lower() and not hiba:
+        users = gsec_users(both)
         log("   gsec: a felhasznalolista elerheto ({0} felhasznalo, SYSDBA a "
             "listaban: {1})".format(len(users), "igen" if "SYSDBA" in users
                                     else "nem"))
@@ -312,7 +317,7 @@ def gsec_preflight(cfg):
 
 def gsec_user_exists(cfg, name):
     rc, out, err = gsec(cfg, ["-display", name])
-    return name.upper() in gsec_users(out)
+    return name.upper() in gsec_users(out + "\n" + err)
 
 
 def cmd_letrehoz(cfg, args):
@@ -564,6 +569,7 @@ def main():
                          "tesztkartyan (a neve 'Minta'-val kell kezdodjon)")
     args = ap.parse_args()
     set_log(os.path.join(HERE, "setup_users_log.txt"))
+    log("setup_users {0} - verzio {1}".format(args.lepes, AGENT_VERSION))
     cfg = load_config()
     try:
         {"titkosit": cmd_titkosit, "jelszo": cmd_jelszo, "terv": cmd_terv,

@@ -49,7 +49,7 @@ import subprocess
 import sys
 import time
 
-from common import (HERE, ConfigError, is_windows, load_config,
+from common import (AGENT_VERSION, HERE, ConfigError, is_windows, load_config,
                     parse_list, run_isql, run_tool)
 
 VIP = "N.FIZTIP = 'FIZ' AND N.FIZTIPID = 10"
@@ -1081,7 +1081,8 @@ def main():
 
     rep = Report()
     rep.lines += ["PEPPER HOUSE - NOVOHOST FELDERITES (csak olvaso)",
-                  "Felhasznalo: {0}".format(cfg.user(user)),
+                  "Felhasznalo: {0}   Verzio: {1}".format(cfg.user(user),
+                                                         AGENT_VERSION),
                   "A jelentes nem tartalmaz nevet, kartyakodot vagy mas "
                   "szemelyes adatot."]
 
