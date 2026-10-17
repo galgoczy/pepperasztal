@@ -1,8 +1,9 @@
 # =====================================================================
 #  Pepper Admin feltoltese a Hostingerre (pepperadmin.zentopia.io)
 #  ---------------------------------------------------------------------
-#  Az admin/public/ mappa TARTALMA kerul az FTP-fiok celmappajaba.
-#  A tobbi (agent/, a Vercel-es app) nem megy fel.
+#  Az admin/public/ mappa TARTALMA kerul az FTP-fiok celmappajaba, plusz
+#  az agent/ mappabol epitett, alairt ugynok-kiadas (kiadasok/).
+#  A Vercel-es app nem megy fel.
 #
 #  INDITAS
 #    Automatikusan, ha az admin/ mappa vagy ez a fajl valtozik (main es
@@ -14,6 +15,9 @@
 #    Secrets:   FTP_SERVER    pl. ftp.zentopia.io vagy az IP (hPanel -> FTP)
 #               FTP_USERNAME  az FTP-fiok felhasznaloneve
 #               FTP_PASSWORD  az FTP-fiok jelszava
+#               AGENT_SIGNING_KEY  az ugynok-kiadasok PRIVAT alairo kulcsa
+#                             (PEM). Nelkule nincs tavoli frissites; a
+#                             publikus resze az agent/kiadas_kulcs.txt-be.
 #    Variables (nem titok, opcionalis):
 #               FTP_DIR       a celmappa az FTP-fiok gyokerehez kepest.
 #                             Alap: ./  (ha a fiok gyokere maga az aldomain
@@ -36,6 +40,8 @@ on:
       - 'claude/**'
     paths:
       - 'admin/**'
+      - 'agent/**'
+      - '.github/scripts/agent_csomag.sh'
       - '.github/workflows/deploy-admin.yml'
 
 # Egyszerre csak egy feltoltes fusson, kulonben a szinkron-allapot osszeakad.
@@ -74,6 +80,16 @@ jobs:
         # A health.php ezt adja vissza; a feltoltes utan ebbol latjuk, hogy
         # tenyleg az uj verzio fut-e (es jo mappaba ment-e).
         run: echo "${GITHUB_SHA::7}" > admin/public/build.txt
+
+      - name: Ugynok-kiadas (alairt csomag)
+        # Az agent/ mappabol alairt csomag a kiadasok/ ala - a gepek ezt
+        # toltik le, ha az adminban kijeloljuk. A privat kulcs csak ez a
+        # secret; a szerverre nem kerul. Ha a kulcs hianyzik vagy nem
+        # egyezik, a kiadas kimarad, de az admin feltoltese megy tovabb.
+        continue-on-error: true
+        env:
+          AGENT_SIGNING_KEY: ${{ secrets.AGENT_SIGNING_KEY }}
+        run: bash .github/scripts/agent_csomag.sh
 
       - name: FTP port ellenorzese
         continue-on-error: true

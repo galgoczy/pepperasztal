@@ -10,6 +10,10 @@ Ez a 0. fázis: **mentés, korlátozott adatbázis-felhasználók és felderít�
 | `install_backup.bat` | a napi mentés ütemezett feladatként, SYSTEM fiókkal | nem |
 | `setup_users.py` | `PEPPER_OLVAS` és `PEPPER_VIP` felhasználó és a jogaik | csak jogosultságot (GRANT) |
 | `felderites.py` | csak olvasó felmérés a VIP-app tervezéséhez | nem |
+| `jelentes.py` + `install_jelentes.bat` | percenkénti életjel a Pepper Adminnak; ha ki van jelölve, frissít | nem |
+| `frissito.py` | aláírt kiadás telepítése – **ez maga soha nem frissül távolról** | nem |
+| `kiadas_kulcs.txt` | a kiadások publikus kulcsa (kézzel kerül a gépre, a frissítés nem írja át) | – |
+| `cacert.pem` | tanúsítványok a HTTPS-hez (friss Windowson a rendszer-tár hiányos lehet) | – |
 | `common.py` | közös isql/ini/DPAPI réteg | – |
 
 Python 3.4-től működik (XP-s gépek is), csak a standard könyvtárat használja.
@@ -113,7 +117,7 @@ python setup_users.py letrehoz      → felhasználók + jogok + ellenőrzés
 
 | Felhasználó | Jogok |
 |---|---|
-| `PEPPER_OLVAS` | `SELECT` minden táblára, kivéve a személyes adatot (`KARTYATULAJDONOS`) |
+| `PEPPER_OLVAS` | `SELECT` **csak** a szükséges 12 táblára (kártyák, napló, nyugták, tételek, ételek); a személyes adatot tartalmazókat (`VEVOK`, `FOGLALAS`, `KEZELO`, `CIMEK`, `SZEMELYZET`, `KARTYATULAJDONOS`) nem látja |
 | `PEPPER_VIP` | `SELECT` + `INSERT`: `KARTYATORZS`, `KARTYANAPLO`; `SELECT`: `KARTYATIPUS`; `UPDATE` **csak** `AKT_KP`, `LIMIT_KP`, `AKT_FORG`, `KARTYA` |
 
 Sehol nincs `DELETE`, és a `PEPPER_VIP` a nyugta- és ételtáblákat nem is látja.
@@ -178,3 +182,56 @@ A SYSDBA jelszó kiszivárgott és nem cserélhető, ezért az adatbázist csak 
 többi kassza is ezen a porton éri el az adatbázist. A felderítés 0. szakasza
 megmutatja, ki kapcsolódik ma. Tűzfalszabály csak ezek ismeretében készüljön,
 és csak ezeket az IP-ket engedje.
+
+## 6. Jelentés a Pepper Adminnak és távoli frissítés
+
+A `jelentes.py` percenként elküldi a mentés állapotát, egy adatbázis-próbát
+(a `PEPPER_OLVAS` kiolvassa a kártyanapló generátorát, táblát nem olvas) és
+az utolsó frissítési kísérlet eredményét. Név, kártyakód, egyenleg vagy
+nyugta nincs benne.
+
+Ha az adminban erre a helyszínre ki van jelölve egy újabb kiadás, átadja a
+`frissito.py`-nak. Az telepítés előtt ellenőrzi:
+- az RSA-aláírást a helyi `kiadas_kulcs.txt`-vel;
+- hogy a verzió újabb-e (régebbire nem lép vissza);
+- hogy a csomagban csak engedélyezett fájlok vannak.
+
+A régi fájlok az `elozo\<verzió>\` mappába kerülnek. A `frissito.py`, a
+kulcs és az ini soha nem cserélődik.
+
+**Kézi visszaállítás**, ha egy kiadás gondot okoz: másold vissza a fájlokat
+az `elozo\<verzió>\` mappából, és az adminban töröld a célverziót.
+
+## 7. Új helyszín bekötése – lépésről lépésre
+
+**Az adminban** (<https://pepperadmin.zentopia.io/>): „Új helyszín", a kulcs
+pl. `RSR`. A megjelenő tokent másold ki, mert csak egyszer látszik.
+
+**A POS gépen**, rendszergazdaként:
+
+1. Az `agent` mappa tartalma a `C:\PepperApp\` mappába, majd szűkítsd a
+   jogait (lásd 1. pont, `icacls`).
+2. `pepper_agent.ini.example` → `pepper_agent.ini`. Benne:
+   `[general] helyszin = RSR`, és az `[felho]` szakaszba a `token = …` sor.
+3. Jelszavak és token titkosítása:
+   - `python setup_users.py titkosit` → a SYSDBA jelszó, a kiírt sor a
+     `[sysdba]` szakaszba;
+   - `python jelentes.py --titkosit` → a token, a kiírt `token_dpapi = …`
+     sor a `[felho]` szakaszba; a nyílt `token` sort töröld.
+4. Mentés: `install_backup.bat`, majd `schtasks /Run /TN "PepperHouse-Mentes"`.
+   A `mentes_log.txt` végén a „tömörítés kész" sornak kell állnia.
+5. Felhasználók:
+   - `python setup_users.py jelszo` → a kiírt sorok az ini-be;
+   - `python setup_users.py letrehoz` → a végén `KESZ.` kell álljon.
+6. Jelentés:
+   - `install_jelentes.bat`;
+   - `python jelentes.py --proba` → a válasz `"ok": true` legyen.
+   Az adminban egy percen belül zöld lesz a helyszín.
+7. Ha be van állítva az aláíró kulcs: a `kiadas_kulcs.txt` is kerüljön a
+   mappába. Ezután a gép az adminból frissíthető.
+
+**Már bekötött gépnél** (pl. Szentkirályi) új verzió kézi telepítésekor:
+cseréld a fájlokat; az ini, a `backup\` mappa és az állapotfájlok
+maradjanak. Utána futtasd újra a `setup_users.py letrehoz`-t (ez szűkíti a
+`PEPPER_OLVAS`-t), majd a 6. lépést.
+

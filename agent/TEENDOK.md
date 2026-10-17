@@ -19,8 +19,16 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 
 ## Folyamatban
 
-- **Mentés ütemezése – Szentkirályi:** az új `install_backup.bat` újrafuttatása
-  (éjszakai + napközbeni feladat), majd mindkettőnél „Next Run Time" ≠ N/A.
+- **Szentkirályi átállítása az új verzióra (2026-10-17.5):** fájlcsere,
+  `setup_users.py letrehoz` (szűkíti a `PEPPER_OLVAS`-t), `[felho]` az
+  ini-be, `install_jelentes.bat`, újra az `install_backup.bat` (napközbeni
+  mentés). Lépések: README, 7. pont.
+- **RSR bekötése tesztre:** README, 7. pont.
+- **Aláíró kulcs:** generálás, `AGENT_SIGNING_KEY` secret, publikus rész az
+  `agent/kiadas_kulcs.txt`-be (lásd `admin/README.md`). Addig a távoli
+  frissítés ki van kapcsolva – minden más működik.
+- **Első admin-felhasználó:** `/jelszo.php` → a konfiguráció
+  `admin_users` részébe.
 
 ## Később
 
@@ -43,18 +51,8 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
     kérdéses: Főzelékek (6), Tészták (32), Napi frissen sültek (33)
   - 0 pont: minden más, különösen a VIP Töltés (36), Kiszállítás (35),
     Protokoll (24), Rendezvény (26), betétdíj, pohár, doboz
-- **`PEPPER_OLVAS` szűkítése – a felhős rész előtt kötelező.** Ma 172 táblát
-  lát, köztük személyes adatot is: `VEVOK`, `FOGLALAS`, `CIMEK`, `SZEMELYZET`,
-  `KEZELO`, `TULAJDONOS`, `UTCAJEGYZEK`. Az ügynöknek ennyi kell:
-  `KARTYATORZS`, `KARTYANAPLO`, `KARTYATIPUS`, `NYUGTAFEJ`, `NYUGTAFIZETES`,
-  `NYUGTATETEL`, `ETELFAJ`, `ETELTIP` (a felderítéshez még `CIKKEK`,
-  `GEPETLAP`, `ETLAPOK`, `KARTYAGYUJTO`). A `setup_users.py` tiltólista
-  helyett engedélylistát kapjon, és vegye vissza a többit.
 - **A NovoHost saját mentése** (`NH_AutoBackupService.exe`, `data\Backup`,
   utoljára 2025-09-06): mi van benne, fut-e még.
-- **Hostinger:** aldomain, PHP-verzió, üres MySQL-adatbázis külön
-  felhasználóval. Első lépésként a gépek percenként jelentik az életjelüket
-  és a mentés állapotát (`mentes_allapot.json`).
 - **Ügynökszabály:** csak feltöltős (1-es típusú) kártyára hajt végre
   parancsot. A személyzeti kártyák és a limitek kimaradnak.
 

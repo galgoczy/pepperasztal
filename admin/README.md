@@ -1,13 +1,26 @@
 # Pepper Admin – pepperadmin.zentopia.io
 
-A POS gépek ügynökeinek felhős oldala a Hostingeren: PHP + MySQL. Az
-`admin/public/` mappa tartalma kerül fel az aldomainre, a GitHub Action
-(`.github/workflows/deploy-admin.yml`) tölti fel FTP-n.
+A POS gépek ügynökeinek felhős oldala a Hostingeren (PHP + MySQL). Az
+`admin/public/` mappa tartalma kerül fel az aldomainre. A GitHub Action
+(`.github/workflows/deploy-admin.yml`) tölti fel FTP-n, minden `admin/` vagy
+`agent/` változásnál, és ugyanez az Action készíti el az aláírt
+ügynök-kiadást is.
 
-Jelenleg csak egy állapotoldal (`/` és `/health.php`): verzió, a feltöltött
-commit, a PHP-verzió, és hogy megvan-e a konfiguráció és működik-e az
-adatbázis. Adatot még nem mutat, ezért belépés sem kell hozzá. A gépek
-életjele és a mentések állapota a következő lépés, belépés mögött.
+## Mit tud
+
+- **Helyszínek:** életjel percenként, ügynökverzió, adatbázis-elérés, az
+  éjszakai és a napközbeni mentés állapota, a visszaállítási pontok listája.
+  Az oldal 30 másodpercenként magától frissül.
+- **Tokenek:** helyszínenként egy token. Felvételkor és cserekor egyszer
+  látszik, a szerveren csak a hash-e marad meg. Egy gombbal cserélhető vagy
+  visszavonható.
+- **Ügynök-frissítés:** az elérhető aláírt kiadást helyszínenként (vagy egy
+  gombbal mindenhol) ki lehet jelölni. A gép a következő jelentésnél
+  (kb. 1 perc) letölti, ellenőrzi és telepíti.
+- **Eseménynapló:** belépések, sikertelen belépések, token- és
+  frissítési műveletek.
+- **Visszaállítás innen szándékosan nem indítható**, és a gépnek parancsot
+  sem küldünk. A kommunikáció egyirányú: a gép jelent, a felhő válaszol.
 
 ## Beállítás (egyszer)
 
@@ -15,47 +28,73 @@ adatbázis. Adatot még nem mutat, ezért belépés sem kell hozzá. A gépek
 
 GitHub → a repó → Settings → Secrets and variables → Actions:
 
-| Típus | Név | Érték |
-|---|---|---|
-| Secret | `FTP_SERVER` | az FTP-szerver (hPanel → Fájlok → FTP-fiókok) |
-| Secret | `FTP_USERNAME` | a pepperadmin FTP-fiók felhasználóneve |
-| Secret | `FTP_PASSWORD` | az FTP-fiók jelszava |
-| Variable (opcionális) | `FTP_DIR` | a célmappa az FTP-fiók gyökeréhez képest; alap: `./` |
-| Variable (opcionális) | `ADMIN_URL` | alap: `https://pepperadmin.zentopia.io` |
+| Név | Mire |
+|---|---|
+| `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD` | feltöltés (kész) |
+| `AGENT_SIGNING_KEY` | az ügynök-kiadások **privát** aláíró kulcsa (lásd lent) |
 
-A titkok sehol nem jelennek meg: se a repóban, se a futási naplóban.
+### 2. Konfiguráció a szerveren (kész)
 
-**`FTP_DIR`:** ha az FTP-fiókot az aldomainhez hoztad létre, a gyökere
-általában maga az aldomain webmappája, és az alapérték (`./`) jó. Ha a
-feltöltés lefut, de az ellenőrző lépés szerint nem az új verzió fut, rossz a
-célmappa. Ilyenkor állítsd be például így: `public_html/`.
+`pepperadmin-config.php` a webmappa fölött (1–4 szinttel feljebb), a
+`config.example.php` mintájára. Ide kerül az adatbázis és a belépés.
 
-### 2. Konfiguráció a szerveren
+### 3. Az első admin-felhasználó
 
-A `config.example.php` mintája alapján hozd létre a hPanel
-Fájlkezelőjében, az alábbi két hely közül az elsőre, ahová írni tudsz:
+1. Nyisd meg a `https://pepperadmin.zentopia.io/jelszo.php` oldalt. Amíg
+   nincs egyetlen felhasználó sem, belépés nélkül is elérhető.
+2. Add meg a felhasználónevet és egy legalább 12 karakteres jelszót. Az oldal
+   kiír egy sort, például: `'gergely' => '$2y$10$…',`
+3. Ezt a sort tedd a konfiguráció `admin_users` részébe.
 
-1. **a webmappa fölé** (1–4 szinttel feljebb bárhová), `pepperadmin-config.php` néven (ajánlott: így a
-   webről semmilyen módon nem érhető el);
-2. **a webmappába**, `config.php` néven (a `.htaccess` tiltja a letöltését,
-   és PHP-ként amúgy sem adna ki tartalmat).
+Ettől kezdve a `jelszo.php` is csak belépve érhető el.
 
-Ebbe kerül az adatbázis neve, felhasználója és jelszava. A deploy ezt a
-fájlt soha nem írja felül és nem törli. **A jelszót ne küldd el chatben, és
-ne tedd a gitbe.**
+### 4. Az aláíró kulcs – enélkül nincs távoli frissítés
 
-### 3. Ellenőrzés
+A saját gépeden (például Git Bash-ben), egyszer:
 
-Nyisd meg: <https://pepperadmin.zentopia.io/>. Mind az öt sor zöld legyen. A
-„Build" a GitHubon látható commit első 7 karaktere.
+```
+openssl genrsa -out pepper_agent_priv.pem 3072
+openssl rsa -in pepper_agent_priv.pem -noout -modulus
+```
+
+1. A `pepper_agent_priv.pem` **teljes tartalmát** másold az
+   `AGENT_SIGNING_KEY` GitHub-secretbe, a fájlt pedig tedd biztonságos
+   helyre (jelszókezelő).
+2. A második parancs `Modulus=` utáni hexa része a **publikus** kulcs. Ezt
+   nyugodtan megoszthatod: írd az `agent/kiadas_kulcs.txt` `n = ` sorába,
+   vagy küldd el, és beírom.
+3. Az `agent/kiadas_kulcs.txt` fájlnak a POS gépeken is ott kell lennie. A
+   távoli frissítés ezt sosem írja felül, ezért **első alkalommal kézzel**
+   kell odamásolni.
+
+A CI minden kiadásnál ellenőrzi, hogy a secret és az `n` egyezik-e. Ha
+nem, kiadás nem készül, és a hiba látszik az Action naplójában.
 
 ## Biztonság
 
-- **HTTPS kötelező**: a `.htaccess` átirányít.
-- **Nem tölthetők le közvetlenül**: a `config*.php`, a rejtett fájlok és a
-  deploy állapotfájlja; a `lib/` mappa csak PHP-ból érhető el.
-- **Az állapotoldal titkot nem ad ki**: adatbázis-hibánál csak annyit ír ki,
-  hogy „hiba"; a részletek a szerver hibanaplójába mennek.
-- **Keresők nem indexelik**: van `robots.txt` és `noindex` fejléc.
-- **A Vercel-deploy kizárja az `admin/` mappát** (`.vercelignore`), így a
-  PHP-fájlok nem jelennek meg a nyilvános appban.
+- **A privát kulcs csak a GitHub-secretben van**, a szerveren soha. A szerver
+  feltörésével sem lehet hamis kiadást csempészni a gépekre.
+- **A gépek ellenőriznek telepítés előtt:**
+  - az RSA-aláírást, a saját helyi publikus kulcsukkal;
+  - hogy a verzió újabb-e (régebbire nem lépnek vissza);
+  - hogy a csomag csak engedélyezett nevű fájlokat tartalmaz;
+  - és hogy nem írja felül a `frissito.py`-t, a kulcsot vagy az ini-t.
+- **A tokenek** csak hash-ként vannak az adatbázisban. A jelentésben küldött
+  helyszín-kulcsnak egyeznie kell a tokenével.
+- **Belépés:** biztonságos session-süti, CSRF-védelem, IP-nként legfeljebb 5
+  hibás próbálkozás 15 percenként, 8 óra tétlenség után kilépés.
+- **A webről nem érhető el:** a konfiguráció, a `lib/` és a `kiadasok/` mappa.
+- **A jelentésben nincs üzleti vagy személyes adat:** se név, se
+  kártyakód, se egyenleg, se nyugta.
+
+## Oldalak
+
+| Cím | Mi |
+|---|---|
+| `/` | belépés, majd a helyszínek áttekintése, új helyszín, frissítés mindenhol |
+| `/helyszin.php?id=…` | egy helyszín részletei, célverzió, token, nyers jelentés |
+| `/naplo.php` | eseménynapló |
+| `/jelszo.php` | jelszó-hash a konfigurációhoz |
+| `/allapot.php`, `/health.php` | telepítési állapot (titok nélkül) |
+| `/api/jelentes.php` | a gépek percenkénti jelentése (token) |
+| `/api/frissites.php` | aláírt kiadás letöltése (token, csak kijelölt verzió) |

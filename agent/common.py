@@ -26,7 +26,7 @@ import time
 
 # Minden kiadasnal noveld - a scriptek indulaskor kiirjak, igy egy
 # hibajelentesbol azonnal latszik, melyik verzio fut a gepen.
-AGENT_VERSION = "2026-10-17.4"
+AGENT_VERSION = "2026-10-17.5"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INI_PATH = os.path.join(HERE, "pepper_agent.ini")
@@ -72,6 +72,8 @@ class Config(object):
             "sevenzip": "",
             "archiv_jelszo": None,
         }
+        # A Pepper Admin (felho) eleresi adatai - jelentes.py
+        self.felho = {"url": "", "token": None}
         self.loaded_from = None
 
     def security_db_path(self):
@@ -107,17 +109,17 @@ class ConfigError(Exception):
     pass
 
 
-def _read_password(cfg, section):
-    """password_dpapi elsobbseget elvez a nyilt password-del szemben."""
-    enc = cfg.get(section, "password_dpapi", fallback="").strip()
+def _read_password(cfg, section, name="password"):
+    """<name>_dpapi elsobbseget elvez a nyilt <name>-mel szemben."""
+    enc = cfg.get(section, name + "_dpapi", fallback="").strip()
     if enc:
         try:
             return dpapi_unprotect(enc)
         except Exception as e:
-            log("FIGYELEM: [{0}] password_dpapi visszafejtese nem sikerult "
-                "({1}); a nyilt password-re esem vissza, ha van.".format(
-                    section, e))
-    pw = cfg.get(section, "password", fallback="").strip()
+            log("FIGYELEM: [{0}] {1}_dpapi visszafejtese nem sikerult "
+                "({2}); a nyilt ertekre esem vissza, ha van.".format(
+                    section, name, e))
+    pw = cfg.get(section, name, fallback="").strip()
     return pw or None
 
 
@@ -145,6 +147,9 @@ def load_config(path=INI_PATH):
             c.users[key][0] = cfg.get(key, "user",
                                       fallback=c.users[key][0]).strip().upper()
             c.users[key][1] = _read_password(cfg, key)
+    if cfg.has_section("felho"):
+        c.felho["url"] = cfg.get("felho", "url", fallback="").strip().rstrip("/")
+        c.felho["token"] = _read_password(cfg, "felho", "token")
     if cfg.has_section("backup"):
         b = c.backup
         b["mappa"] = cfg.get("backup", "mappa", fallback=b["mappa"]).strip()

@@ -17,4 +17,10 @@ return [
     'db_name' => 'u000000000_pepperadmin',
     'db_user' => 'u000000000_pepperadmin',
     'db_pass' => 'IDE_A_JELSZO',
+
+    // Belepes az adminba. A hash-t a /jelszo.php oldal kesziti (amig nincs
+    // egy felhasznalo sem, belepes nelkul is elerheto).
+    'admin_users' => [
+        // 'gergely' => '$2y$10$...',
+    ],
 ];

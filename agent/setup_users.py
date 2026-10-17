@@ -49,8 +49,20 @@ ALLAPOT = os.path.join(HERE, "setup_users_allapot.json")
 IDENT = re.compile(r"^[A-Z0-9_$]+$")
 
 # A szemelyes adatot tartalmazo tablak - az olvaso felhasznalo sem latja.
-# Az ini [olvas] kihagy = ... sora feluliraja.
-OLVAS_KIHAGY = ("KARTYATULAJDONOS",)
+# ENGEDELYLISTA: a PEPPER_OLVAS csak ezeket a tablakat latja. Minden mas -
+# koztuk a szemelyes adatot tartalmazo VEVOK, FOGLALAS, KEZELO, CIMEK,
+# SZEMELYZET, KARTYATULAJDONOS - tiltott, es a 'letrehoz' a korabban
+# kiadott tobbletjogot vissza is vonja. Az ini [olvas] tablak = ... felulirja.
+OLVAS_TABLAK = (
+    "KARTYATORZS", "KARTYANAPLO", "KARTYATIPUS",
+    "NYUGTAFEJ", "NYUGTAFIZETES", "NYUGTATETEL",
+    "ETELFAJ", "ETELTIP",
+    # csak a felderiteshez:
+    "CIKKEK", "GEPETLAP", "ETLAPOK", "KARTYAGYUJTO",
+)
+# Ezeket az ellenorzes kulon kiprobalja: a PEPPER_OLVAS NE lassa oket.
+OLVAS_TILTOTT_PROBA = ("KARTYATULAJDONOS", "VEVOK", "FOGLALAS", "KEZELO",
+                       "CIMEK", "SZEMELYZET")
 
 VIP_SELECT = ("KARTYATORZS", "KARTYANAPLO", "KARTYATIPUS")
 VIP_INSERT = ("KARTYATORZS", "KARTYANAPLO")
@@ -174,7 +186,7 @@ def obj_grant_present(privs, jog, obj, kapo_tipus, kapo):
                and p[2] == JOG_BETU[jog] and p[3] == obj for p in privs)
 
 
-def olvas_kihagy(cfg):
+def olvas_tablak(cfg):
     import configparser
     c = configparser.ConfigParser()
     if cfg.loaded_from:
@@ -182,15 +194,17 @@ def olvas_kihagy(cfg):
             c.read(cfg.loaded_from, encoding="utf-8")
         except TypeError:
             c.read(cfg.loaded_from)
-    raw = c.get("olvas", "kihagy", fallback="") if c.has_section("olvas") \
+    raw = c.get("olvas", "tablak", fallback="") if c.has_section("olvas") \
         else ""
     items = [x.strip().upper() for x in raw.split(",") if x.strip()]
-    return tuple(items) if items else OLVAS_KIHAGY
+    return tuple(items) if items else OLVAS_TABLAK
 
 
-# ===========================================================================
-# terv / letrehoz
-# ===========================================================================
+def olvas_kihagy(cfg, tables):
+    """Minden tabla, ami NINCS az engedelylistan."""
+    keep = set(olvas_tablak(cfg))
+    return tuple(t for t in tables if t not in keep)
+
 
 def build_grants(cfg, tables, kihagy):
     olvas, vip = cfg.user("olvas"), cfg.user("vip")
@@ -221,17 +235,10 @@ def cmd_terv(cfg, args):
     for key in ("olvas", "vip"):
         print("  gsec -add {0} -pw ********".format(cfg.user(key)))
     print("\n== GRANT (SYSDBA-kent, egy isql futasban, COMMIT-tal)")
-    kihagy = olvas_kihagy(cfg)
-    try:
-        tables = user_tables(cfg)
-        print("  -- PEPPER_OLVAS: SELECT {0} tablara (kihagyva: {1})".format(
-            len([t for t in tables if t not in kihagy]), ", ".join(kihagy)))
-    except Exception as e:
-        tables = []
-        print("  -- (tablalista nem elerheto: {0})".format(e))
-        print("  -- PEPPER_OLVAS: SELECT minden tablara, kiveve: " +
-              ", ".join(kihagy))
-    for s in build_grants(cfg, [], kihagy):
+    keep = olvas_tablak(cfg)
+    print("  -- PEPPER_OLVAS: SELECT csak ezekre: " + ", ".join(keep))
+    print("  -- minden mas korabbi PEPPER_OLVAS SELECT-jogot VISSZAVON")
+    for s in build_grants(cfg, [], ()):
         print("  " + s)
     for g in OBJEKTUM_JOGOK:
         print("  " + obj_grant_sql(*g))
@@ -353,13 +360,22 @@ def cmd_letrehoz(cfg, args):
 
     log("3. Jogok (GRANT)")
     elotte = privileges(cfg)
-    kihagy = olvas_kihagy(cfg)
     tables = user_tables(cfg)
+    kihagy = olvas_kihagy(cfg, tables)
     for t in VIP_SELECT + VIP_INSERT:
         if t not in tables:
             sys.exit("HIBA: a(z) {0} tabla nem letezik - ez nem az a "
                      "NovoHost, amire a script keszult.".format(t))
     sql = build_grants(cfg, tables, kihagy)
+    # Engedelylista: a korabban (pl. a regi tiltolistas valtozat altal)
+    # kiadott tobbletjogokat visszavonjuk.
+    tobblet = sorted(set(p[3] for p in elotte
+                         if p[0] == cfg.user("olvas") and p[2] == "S"
+                         and p[3] in kihagy and IDENT.match(p[3])))
+    for t in tobblet:
+        sql.append("REVOKE SELECT ON {0} FROM {1};".format(t, cfg.user("olvas")))
+    if tobblet:
+        log("   PEPPER_OLVAS tobbletjog visszavonva: {0} tabla".format(len(tobblet)))
 
     # Csak azt a trigger/eljaras-jogot adjuk, ami meg nincs meg, es
     # feljegyezzuk, hogy a visszavonas CSAK ezeket vegye vissza. Egy
@@ -381,14 +397,14 @@ def cmd_letrehoz(cfg, args):
 
     _save_state({"datum": time.strftime("%Y-%m-%d %H:%M:%S"),
                  "objektum_jogok_hozzaadva": hozzaadott,
-                 "olvas_kihagy": list(kihagy)})
+                 "olvas_tablak": list(olvas_tablak(cfg))})
 
     out, err = run_isql(cfg, "\n".join(sql), user_key="sysdba", commit=True)
     if err:
         log("   isql uzenet: " + err.strip().splitlines()[0])
 
     log("4. Ellenorzes")
-    ok = verify(cfg, kihagy)
+    ok = verify(cfg, tables)
     log("KESZ." if ok else "HIBA: az ellenorzes nem ment at - lasd fent.")
     sys.exit(0 if ok else 1)
 
@@ -419,8 +435,10 @@ def _expect(cfg, key, sql, allowed, label):
     return good
 
 
-def verify(cfg, kihagy=None):
-    kihagy = kihagy or olvas_kihagy(cfg)
+def verify(cfg, tables=None):
+    if tables is None:
+        tables = user_tables(cfg)
+    keep = set(olvas_tablak(cfg))
     olvas, vip = "olvas", "vip"
     checks = [
         (olvas, "SELECT COUNT(*) FROM KARTYATORZS WHERE ID = -1;", True,
@@ -451,10 +469,10 @@ def verify(cfg, kihagy=None):
         (vip, "SELECT COUNT(*) FROM KARTYATULAJDONOS WHERE ID = -1;", False,
          "VIP    SELECT KARTYATULAJDONOS"),
     ]
-    for t in kihagy:
-        if IDENT.match(t):
-            checks.append((olvas, "SELECT COUNT(*) FROM {0};".format(t),
-                           False, "OLVAS  SELECT {0} (kihagyott)".format(t)))
+    for t in OLVAS_TILTOTT_PROBA:
+        if t in tables and t not in keep:
+            checks.append((olvas, "SELECT COUNT(*) FROM {0} WHERE 1 = 0;".format(t),
+                           False, "OLVAS  SELECT {0} (nincs engedelyezve)".format(t)))
     ok = True
     for key, sql, allowed, label in checks:
         ok = _expect(cfg, key, sql, allowed, label) and ok

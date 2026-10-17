@@ -1,0 +1,17 @@
+# Pepper House ugynok - KIADASI KULCS (PUBLIKUS RESZ)
+# ---------------------------------------------------------------------
+# A frissito.py ezzel ellenorzi a letoltott csomag alairasat. Ez publikus
+# adat, nem titok. A hozza tartozo PRIVAT kulcs csak a GitHub secretben
+# (AGENT_SIGNING_KEY) van, se a repoban, se a szerveren nincs.
+#
+# AMIG ITT NINCS 'n = ...' SOR, A TAVOLI FRISSITES KI VAN KAPCSOLVA.
+#
+# Kitoltes (egyszer, a sajat gepeden, pl. Git Bash-ben):
+#   openssl genrsa -out pepper_agent_priv.pem 3072
+#   openssl rsa -in pepper_agent_priv.pem -noout -modulus
+# A "Modulus=" utani hexet ird ide az n = utan, a privat kulcs TELJES
+# tartalmat pedig a GitHub AGENT_SIGNING_KEY secretbe. A privat kulcsot
+# tartsd biztonsagos helyen (jelszokezelo), es ne kuldd el senkinek.
+#
+# n = <hex modulus>
+e = 65537

@@ -13,7 +13,9 @@
 
 declare(strict_types=1);
 
-const PA_VERSION = '0.1.2';
+const PA_VERSION = '0.2.0';
+
+date_default_timezone_set('Europe/Budapest');
 
 /** Hol talaltuk a konfiguraciot: [utvonal, hely-leiras] vagy [null, null]. */
 function pa_config_location(): array
@@ -91,14 +93,22 @@ function pa_db(): PDO
     static $pdo = null;
     if ($pdo === null) {
         $c = pa_config();
-        $dsn = sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4',
+        // db_dsn csak helyi teszthez (sqlite:...); elesben a MySQL-adatok.
+        $dsn = $c['db_dsn'] ?? sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4',
             $c['db_host'] ?? 'localhost', $c['db_name'] ?? '');
-        $pdo = new PDO($dsn, $c['db_user'] ?? '', $c['db_pass'] ?? '', [
+        $opts = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
             PDO::ATTR_TIMEOUT            => 5,
-        ]);
+        ];
+        if (strncmp($dsn, 'mysql:', 6) === 0) {
+            // UPDATE utan a rowCount() a TALALT sorokat adja, ne csak a
+            // tenylegesen valtozottakat - kulonben egy valtozatlan
+            // jelentesnel a kod INSERT-tel probalkozna (duplikalt kulcs).
+            $opts[PDO::MYSQL_ATTR_FOUND_ROWS] = true;
+        }
+        $pdo = new PDO($dsn, $c['db_user'] ?? '', $c['db_pass'] ?? '', $opts);
     }
     return $pdo;
 }

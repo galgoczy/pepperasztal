@@ -9,3 +9,5 @@ __pycache__/
 agent/felderites_futas.txt
 admin/public/config.php
 admin/public/build.txt
+agent/elozo/
+agent/mentes.lock
