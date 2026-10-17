@@ -13,7 +13,7 @@
 
 declare(strict_types=1);
 
-const PA_VERSION = '0.1.1';
+const PA_VERSION = '0.1.2';
 
 /** Hol talaltuk a konfiguraciot: [utvonal, hely-leiras] vagy [null, null]. */
 function pa_config_location(): array
@@ -42,6 +42,30 @@ function pa_config_location(): array
         return $loc = [$p, 'a webmappaban (config.php)'];
     }
     return $loc = [null, null];
+}
+
+/**
+ * Hol keressuk a konfiguraciot - csak akkor mutatjuk, ha meg hianyzik.
+ * A /home/<felhasznalo> reszt ~-ra csereljuk, hogy a tarhely-azonosito
+ * ne jelenjen meg.
+ */
+function pa_config_candidates(): array
+{
+    $mask = function (string $p): string {
+        return preg_replace('#^/home/[^/]+#', '~', $p);
+    };
+    $out = [];
+    $dir = dirname(__DIR__);
+    for ($up = 1; $up <= 4; $up++) {
+        $parent = dirname($dir);
+        if ($parent === $dir) {
+            break;
+        }
+        $dir = $parent;
+        $out[] = $mask($dir . '/pepperadmin-config.php');
+    }
+    $out[] = $mask(dirname(__DIR__) . '/config.php');
+    return $out;
 }
 
 function pa_config_path(): ?string

@@ -64,6 +64,14 @@ function row(string $label, string $value, bool $good): string
     <?= row('Konfiguráció', $st['config'] ? 'megvan – ' . $st['config_hely'] : 'hiányzik', $st['config']) ?>
     <?= row('Adatbázis', DB_LABEL[$st['db']] ?? $st['db'], $st['db'] === 'ok') ?>
   </table>
+<?php if (!$st['config']): ?>
+  <p style="margin-top:24px">A konfigurációs fájlt ezeken a helyeken kerestem (ebben a sorrendben):</p>
+  <ul style="color:var(--muted);font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;padding-left:18px;word-break:break-all">
+<?php foreach (pa_config_candidates() as $c): ?>
+    <li><?= htmlspecialchars($c) ?></li>
+<?php endforeach; ?>
+  </ul>
+<?php endif; ?>
 </main>
 </body>
 </html>
