@@ -56,6 +56,17 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   utoljára 2025-09-06): mi van benne, fut-e még.
 - **Ügynökszabály:** csak feltöltős (1-es típusú) kártyára hajt végre
   parancsot. A személyzeti kártyák és a limitek kimaradnak.
+- **Kártyanyitás és technikai név** (a NovoHost egy helyszínen belül nem
+  enged két azonos `NEV`-et, a személyzeti kártyákkal együtt sem):
+  - a helyszín gépe a saját adatbázisa összes nevét nézi, és egyedi nevet
+    választ („Tóth János”, „Tóth János 2”, …); ütközés a kis-/nagybetű
+    és a szóköz eltérése is; a `NEV` hosszába bele kell férnie;
+  - verseny esetén a `VAN_MAR_ILYEN_NEV` hibára a következő sorszámmal
+    újrapróbál;
+  - visszajelzi a felhőnek: felhasználó → helyszín → kártya-ID + technikai
+    név. Más kártyák nevét (személyzet, többi vendég) a felhő nem kapja meg;
+  - ha a kasszán átnevezik a kártyát, a gép a következő szinkronnál
+    jelenti az új nevet.
 
 ## Eldöntve (nem csinálunk)
 
