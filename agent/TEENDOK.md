@@ -60,7 +60,10 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   enged két azonos `NEV`-et, a személyzeti kártyákkal együtt sem):
   - a helyszín gépe a saját adatbázisa összes nevét nézi, és egyedi nevet
     választ („Tóth János”, „Tóth János 2”, …); ütközés a kis-/nagybetű
-    és a szóköz eltérése is; a `NEV` hosszába bele kell férnie;
+    és a szóköz eltérése is; a `NEV` `VARCHAR(40)` (Szentkirályin a
+    leghosszabb név 16 karakter), ezért hosszú névnél az alapnevet vágjuk,
+    hogy a sorszám beférjen; a `KARTYA` `VARCHAR(20)`, egy EAN-13 kód
+    elválasztójelekkel (`;…?`, 15 karakter) is belefér;
   - verseny esetén a `VAN_MAR_ILYEN_NEV` hibára a következő sorszámmal
     újrapróbál;
   - visszajelzi a felhőnek: felhasználó → helyszín → kártya-ID + technikai
