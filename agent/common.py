@@ -47,6 +47,9 @@ class Config(object):
 
     def __init__(self):
         self.ib_bin = r"C:\Program Files (x86)\Borland\InterBase\bin"
+        # A felhasznalokat tarolo biztonsagi adatbazis (IB 7.x: admin.ib,
+        # IB6: isc4.gdb). Ures = az InterBase mappajaban keressuk.
+        self.security_db = ""
         self.db_path = (r"C:\Program Files (x86)\novohost2\nhtouch"
                         r"\data\novohost.ib")
         self.helyszin = ""
@@ -65,6 +68,16 @@ class Config(object):
             "archiv_jelszo": None,
         }
         self.loaded_from = None
+
+    def security_db_path(self):
+        if self.security_db:
+            return self.security_db
+        root = os.path.dirname(self.ib_bin.rstrip("\\/"))
+        for name in ("admin.ib", "isc4.gdb", "security.fdb"):
+            p = os.path.join(root, name)
+            if os.path.exists(p):
+                return p
+        return ""
 
     def tool(self, name):
         return os.path.join(self.ib_bin, name)
@@ -118,6 +131,8 @@ def load_config(path=INI_PATH):
     if cfg.has_section("interbase"):
         c.ib_bin = cfg.get("interbase", "bin", fallback=c.ib_bin).strip()
         c.db_path = cfg.get("interbase", "db_path", fallback=c.db_path).strip()
+        c.security_db = cfg.get("interbase", "security_db",
+                                fallback="").strip()
     if cfg.has_section("general"):
         c.helyszin = cfg.get("general", "helyszin", fallback="").strip()
     for key in c.users:

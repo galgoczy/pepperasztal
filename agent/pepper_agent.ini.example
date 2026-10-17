@@ -23,6 +23,9 @@ helyszin = Szentkiralyi
 ; Csak akkor kell, ha nem az alapertelmezett helyen van.
 ; bin = C:\Program Files (x86)\Borland\InterBase\bin
 ; db_path = C:\Program Files (x86)\novohost2\nhtouch\data\novohost.ib
+; A felhasznalokat tarolo adatbazis (IB 7.x: admin.ib, IB6: isc4.gdb).
+; Alapbol az InterBase mappajaban keressuk (a bin feletti mappa).
+; security_db = C:\Program Files (x86)\Borland\InterBase\admin.ib
 
 [sysdba]
 ; A NovoHost meglevo SYSDBA jelszava. NEM valtoztatjuk meg.

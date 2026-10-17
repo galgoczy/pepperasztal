@@ -239,8 +239,20 @@ def cmd_terv(cfg, args):
 
 
 def gsec(cfg, args):
-    """gsec hivas. Ha a kornyezeti valtozos hitelesitest ez a verzio nem
-    ismeri, egyszer ujraprobalja explicit -user/-password kapcsoloval."""
+    """
+    gsec hivas TCP-n at (-database localhost:...admin.ib).
+
+    MIERT: kapcsolo nelkul a gsec helyi (nem halozati) kapcsolattal nyitja
+    a biztonsagi adatbazist, ami ujabb Windowson a szolgaltataskent futo
+    InterBase-szel nem mukodik: "unavailable database" (elesben igy jart,
+    Szentkiralyi, IB 7.5). Az isql/gbak ezert is localhost:-on megy.
+
+    Ha a kornyezeti valtozos hitelesitest ez a verzio nem ismeri, egyszer
+    ujraprobalja explicit -user/-password kapcsoloval.
+    """
+    sec = cfg.security_db_path()
+    if sec:
+        args = ["-database", "localhost:" + sec] + list(args)
     rc, out, err = run_tool(cfg, "gsec.exe" if is_windows() else "gsec", args)
     text = (out + "\n" + err).lower()
     auth_failed = ("user name and password" in text
@@ -256,6 +268,22 @@ def gsec(cfg, args):
     return rc, out, err
 
 
+def gsec_preflight(cfg):
+    """Eleri-e a gsec a felhasznalolistat? Ha nem, semmit nem probalunk."""
+    sec = cfg.security_db_path()
+    log("   biztonsagi adatbazis: {0}".format(
+        sec or "NEM TALALOM (a gsec a sajat alapertelmezeset hasznalja)"))
+    rc, out, err = gsec(cfg, ["-display"])
+    if not re.search(r"^\s*SYSDBA\b", out, re.M | re.I):
+        msg = (err or out).strip().splitlines()
+        sys.exit("HIBA: a gsec nem eri el a felhasznalolistat: {0}\n"
+                 "Ellenorizd, hol van az admin.ib (IB 7.x) vagy isc4.gdb (IB6), "
+                 "es add meg a pepper_agent.ini-ben:\n"
+                 "  [interbase]\n  security_db = C:\\...\\admin.ib\n"
+                 "Semmi nem valtozott.".format(msg[0] if msg else "?"))
+    log("   gsec: a felhasznalolista elerheto")
+
+
 def gsec_user_exists(cfg, name):
     rc, out, err = gsec(cfg, ["-display", name])
     return bool(re.search(r"^\s*" + re.escape(name) + r"\b", out,
@@ -267,20 +295,23 @@ def cmd_letrehoz(cfg, args):
         cfg.password(key)          # ConfigError, ha hianyzik
 
     log("1. Felhasznalok (gsec)")
+    gsec_preflight(cfg)
     for key in ("olvas", "vip"):
         name = cfg.user(key)
-        if gsec_user_exists(cfg, name):
+        existed = gsec_user_exists(cfg, name)
+        if existed:
             rc, out, err = gsec(cfg, ["-modify", name, "-pw",
                                       cfg.password(key)])
-            log("   {0}: mar letezett, jelszo frissitve".format(name))
         else:
             rc, out, err = gsec(cfg, ["-add", name, "-pw", cfg.password(key)])
-            log("   {0}: letrehozva".format(name))
         if err.strip():
             log("   gsec uzenet: " + err.strip().splitlines()[0])
+        # Csak a visszaolvasas utan mondjuk ki, hogy sikerult.
         if not gsec_user_exists(cfg, name):
             sys.exit("HIBA: {0} nem latszik a gsec -display kimeneteben. "
                      "Leallok, jogot nem adok.".format(name))
+        log("   {0}: {1}".format(name, "mar letezett, jelszo frissitve"
+                                 if existed else "letrehozva"))
 
     log("2. Kapcsolat-proba az uj felhasznalokkal")
     for key in ("olvas", "vip"):
