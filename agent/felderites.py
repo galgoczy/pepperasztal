@@ -619,6 +619,31 @@ def sec_kartyak(db, rep):
         rep.verdict("Nincs LIMIT folotti koltes - lehet, hogy kikenyszerul, "
                     "de ez nem bizonyitek. Elo teszt kell.")
 
+    # Hitelkeret (AKT_HITEL / LIMIT_HITEL): a feltetelezes az, hogy mar nem
+    # hasznaljak. A VIP-ugynok ezekhez a mezokhoz nem kap jogot.
+    rep.sub("Hitelkeret - hasznalja-e meg valaki?")
+    hk, _ = db.num("SELECT COUNT(*) AS DB FROM KARTYATORZS "
+                   "WHERE LIMIT_HITEL > 0;")
+    ha, _ = db.num("SELECT COUNT(*) AS DB FROM KARTYATORZS "
+                   "WHERE AKT_HITEL > 0.5 OR AKT_HITEL < -0.5;")
+    tz, _ = db.num("SELECT COUNT(*) AS DB FROM KARTYATORZS WHERE TARTOZAS = 1;")
+    hn, e = db.rows("SELECT COUNT(*) AS DB, MAX(DATUM) AS UTOLSO FROM "
+                    "KARTYANAPLO WHERE TTIPUS IN ('HF', 'FH');",
+                    ["DB", "UTOLSO"])
+    rep.err(e)
+    rep.kv("Kartya LIMIT_HITEL > 0", hk)
+    rep.kv("Kartya AKT_HITEL <> 0", ha)
+    rep.kv("Kartya TARTOZAS = 1", tz)
+    hdb = hn[0].get("DB") if hn else None
+    rep.kv("Hitelmozgas a naploban (HF/FH) / utolso",
+           "{0} / {1}".format(hdb, (hn[0].get("UTOLSO") if hn else None) or "-"))
+    if not hk and not ha and not tz:
+        rep.verdict("Nincs elo hitelkeret es nincs tartozas - a hitelkeret "
+                    "nincs hasznalatban. A dashboardon nem kell kezelni.")
+    else:
+        rep.verdict("Van elo hitelkeret vagy tartozas - meg kell beszelni, "
+                    "mielott a dashboard barmit mutat vagy kezel belole.")
+
     for t in ("KARTYATIPUS", "KARTYAGYUJTO"):
         rep.sub(t + " (konfiguracio, teljes tartalom)")
         out, e = db.raw("SELECT * FROM {0};".format(t))
