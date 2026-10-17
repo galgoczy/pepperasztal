@@ -11,6 +11,7 @@ Ez a 0. fázis: **mentés, korlátozott adatbázis-felhasználók és felderít�
 | `setup_users.py` | `PEPPER_OLVAS` és `PEPPER_VIP` felhasználó és a jogaik | csak jogosultságot (GRANT) |
 | `felderites.py` | csak olvasó felmérés a VIP-app tervezéséhez | nem |
 | `jelentes.py` + `install_jelentes.bat` | percenkénti életjel a Pepper Adminnak; ha ki van jelölve, frissít | nem |
+| `kartyak.py` | a feltöltős kártyák mozgásai és egyenlegei a jelentéssel (`jelentes.py` hívja) | nem |
 | `frissito.py` | aláírt kiadás telepítése – **ez maga soha nem frissül távolról** | nem |
 | `kiadas_kulcs.txt` | a kiadások publikus kulcsa (kézzel kerül a gépre, a frissítés nem írja át) | – |
 | `cacert.pem` | tanúsítványok a HTTPS-hez (friss Windowson a rendszer-tár hiányos lehet) | – |
@@ -186,9 +187,21 @@ megmutatja, ki kapcsolódik ma. Tűzfalszabály csak ezek ismeretében készülj
 ## 6. Jelentés a Pepper Adminnak és távoli frissítés
 
 A `jelentes.py` percenként elküldi a mentés állapotát, egy adatbázis-próbát
-(a `PEPPER_OLVAS` kiolvassa a kártyanapló generátorát, táblát nem olvas) és
-az utolsó frissítési kísérlet eredményét. Név, kártyakód, egyenleg vagy
-nyugta nincs benne.
+és az utolsó frissítési kísérlet eredményét.
+
+**Feltöltős kártyák** (`kartyak.py`, csak olvas, `PEPPER_OLVAS`):
+- a `KARTYANAPLO` új sorai a feltöltős (1-es típusú) kártyákra: kártya-ID,
+  mozgás (`FK` költés, `KF` feltöltés), összeg, előtte lévő egyenleg,
+  időpont. Jelentésenként legfeljebb 300 sor, így az előzmény
+  fokozatosan felmegy;
+- az egyenlegek pillanatképe, ha volt mozgás, vagy 15 percenként;
+- naponta egyszer (02:00 után) egyeztetés: kassza szerinti egyenleg =
+  utolsó naplósor szerinti egyenleg.
+
+Név, kártyakód, tulajdonos, nyugta és személyzeti kártya nem megy fel. A
+gép csak akkor lép tovább a naplóban, ha a szerver visszaigazolta az
+adatot, ezért szakadás után sem marad ki és nem duplázódik semmi.
+Kikapcsolás: az ini-ben `[kartyak]` → `kuldes = nem`.
 
 Ha az adminban erre a helyszínre ki van jelölve egy újabb kiadás, átadja a
 `frissito.py`-nak. Az telepítés előtt ellenőrzi:

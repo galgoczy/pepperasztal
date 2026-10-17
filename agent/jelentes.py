@@ -9,8 +9,11 @@ Mit kuld (HTTPS, helyszin-tokennel):
     generatoranak erteke (GEN_ID(..., 0) - tablat nem olvas, nem ir)
   - az utolso frissitesi kiserlet eredmenye
 
-Amit NEM kuld: nevet, kartyakodot, egyenleget, nyugtat - semmilyen
-uzleti vagy szemelyes adatot.
+Feltoltos kartyak (kartyak.py): a mozgasok (kartya-ID, osszeg, idopont)
+es az egyenlegek - nev es kartyakod nelkul. Kikapcsolhato:
+[kartyak] kuldes = nem.
+
+Amit NEM kuld: nevet, kartyakodot, nyugtat, szemelyzeti kartyat.
 
 Ha a valasz szerint ki van jelolve egy ujabb, alairt kiadas, atadja a
 frissito.py-nak (ami az alairast es a verziot ellenorzi). Parancsot a
@@ -78,17 +81,26 @@ def db_proba(cfg):
 
 
 def payload(cfg):
-    return {
+    db = db_proba(cfg)
+    d = {
         "helyszin": cfg.helyszin,
         "gep": socket.gethostname(),
         "agent_verzio": AGENT_VERSION,
         "python": platform.python_version(),
         "os": platform.platform()[:80],
         "ido": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "db": db_proba(cfg),
+        "db": db,
         "mentes": read_json(MENTES) or {},
         "frissites": read_json(FRISSITES),
     }
+    # Feltoltos kartyak mozgasai (kartyak.py). Hiba eseten az eletjel
+    # akkor is elmegy, a hiba pedig latszik az adminban.
+    try:
+        import kartyak
+        d["kartyak"] = kartyak.gyujt(cfg, db.get("naplo_gen") if db.get("ok") else None)
+    except Exception as e:
+        d["kartyak"] = {"hiba": str(e)[:200]}
+    return d
 
 
 def ssl_context():
@@ -237,6 +249,13 @@ def main():
         resp = {"ok": False, "hiba": "kapcsolodasi hiba: {0}".format(e)}
     if args.proba:
         print("\nValasz:", json.dumps(resp, ensure_ascii=False))
+    ki = data.get("kartyak")
+    if ki and "hiba" not in ki:
+        try:
+            import kartyak
+            kartyak.nyugtaz(ki, resp)
+        except Exception as e:
+            log("kartya-kurzor mentese nem sikerult: {0}".format(e))
 
     # Csak valtozast naplozunk: ok -> hiba, hiba -> ok, vagy uj hibaszoveg.
     elozo = read_json(UTOLSO) or {}

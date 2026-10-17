@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-const PA_SCHEMA_VERSION = 2;
+const PA_SCHEMA_VERSION = 3;
 
 function pa_is_sqlite(): bool
 {
@@ -69,6 +69,44 @@ function pa_migrate(): void
         nev VARCHAR(100) NOT NULL,
         letrehozva VARCHAR(19) NOT NULL,
         utoljara VARCHAR(19) NULL)$tail");
+    // 3: feltoltos kartyak - egyenleg-pillanatkep es a KARTYANAPLO mozgasai
+    // (nev es kartyakod nelkul; a kartya-ID a helyszin NovoHostjaban ervenyes)
+    $db->exec("CREATE TABLE IF NOT EXISTS kartya (
+        helyszin_id INT NOT NULL,
+        kartya_id INT NOT NULL,
+        egyenleg DECIMAL(14,2) NULL,
+        egyenleg_ido VARCHAR(19) NULL,
+        egyenleg_gen INT NULL,
+        ervenyes SMALLINT NULL,
+        naplo_egyenleg DECIMAL(14,2) NULL,
+        utolso_naplo_id INT NULL,
+        utolso_mozgas VARCHAR(19) NULL,
+        PRIMARY KEY (helyszin_id, kartya_id))$tail");
+    $db->exec("CREATE TABLE IF NOT EXISTS kartyamozgas (
+        helyszin_id INT NOT NULL,
+        naplo_id INT NOT NULL,
+        kartya_id INT NOT NULL,
+        tipus VARCHAR(4) NOT NULL,
+        osszeg DECIMAL(14,2) NULL,
+        elotte DECIMAL(14,2) NULL,
+        ido VARCHAR(19) NULL,
+        erkezett VARCHAR(19) NOT NULL,
+        PRIMARY KEY (helyszin_id, naplo_id))$tail");
+    $db->exec("CREATE TABLE IF NOT EXISTS helyszin_allapot (
+        helyszin_id INT NOT NULL,
+        k VARCHAR(32) NOT NULL,
+        v MEDIUMTEXT NULL,
+        ido VARCHAR(19) NOT NULL,
+        PRIMARY KEY (helyszin_id, k))$tail");
+    if ($sqlite) {
+        $db->exec('CREATE INDEX IF NOT EXISTS ix_mozgas_kartya ON kartyamozgas (helyszin_id, kartya_id, naplo_id)');
+    } else {
+        try {
+            $db->exec('CREATE INDEX ix_mozgas_kartya ON kartyamozgas (helyszin_id, kartya_id, naplo_id)');
+        } catch (Throwable $e) {
+            // mar letezik
+        }
+    }
     if ($sqlite) {
         // MEDIUMTEXT -> sqlite-ban TEXT affinitas, rendben van.
         $db->exec('CREATE INDEX IF NOT EXISTS ix_login_ip ON login_proba (ip, ido)');
@@ -84,6 +122,26 @@ function pa_migrate(): void
         ? "INSERT OR REPLACE INTO meta (k, v) VALUES ('sema_verzio', ?)"
         : "REPLACE INTO meta (k, v) VALUES ('sema_verzio', ?)");
     $up->execute([(string)PA_SCHEMA_VERSION]);
+}
+
+/** Helyszinenkenti allapot (pl. naplo-kurzor, napi egyeztetes) - kulcs/ertek. */
+function pa_hely_set(int $hid, string $k, string $v): void
+{
+    $db = pa_db();
+    $up = $db->prepare('UPDATE helyszin_allapot SET v = ?, ido = ? WHERE helyszin_id = ? AND k = ?');
+    $up->execute([$v, pa_now(), $hid, $k]);
+    if ($up->rowCount() === 0) {
+        $db->prepare('INSERT INTO helyszin_allapot (helyszin_id, k, v, ido) VALUES (?, ?, ?, ?)')
+            ->execute([$hid, $k, $v, pa_now()]);
+    }
+}
+
+function pa_hely_get(int $hid, string $k): ?array
+{
+    $st = pa_db()->prepare('SELECT v, ido FROM helyszin_allapot WHERE helyszin_id = ? AND k = ?');
+    $st->execute([$hid, $k]);
+    $r = $st->fetch();
+    return $r ?: null;
 }
 
 function pa_now(): string

@@ -11,6 +11,9 @@ A POS gépek ügynökeinek felhős oldala a Hostingeren (PHP + MySQL). Az
 - **Helyszínek:** életjel percenként, ügynökverzió, adatbázis-elérés, az
   éjszakai és a napközbeni mentés állapota, a visszaállítási pontok listája.
   Az oldal 30 másodpercenként magától frissül.
+- **Feltöltős kártyák:** helyszínenként a kártyák egyenlege (kassza és
+  napló szerint), a napi egyeztetés eredménye és a legutóbbi mozgások. Név
+  és kártyakód nem jön fel, csak a NovoHost kártya-ID-ja.
 - **Tokenek:** helyszínenként egy token. Felvételkor és cserekor egyszer
   látszik, a szerveren csak a hash-e marad meg. Egy gombbal cserélhető vagy
   visszavonható.
@@ -106,8 +109,10 @@ nem, kiadás nem készül, és a hiba látszik az Action naplójában.
   van. Biztonságos session-süti, CSRF-védelem, IP-nként legfeljebb 5
   sikertelen belépés 15 percenként, 8 óra tétlenség után kilépés.
 - **A webről nem érhető el:** a konfiguráció, a `lib/` és a `kiadasok/` mappa.
-- **A jelentésben nincs üzleti vagy személyes adat:** se név, se
-  kártyakód, se egyenleg, se nyugta.
+- **A jelentésben nincs személyes adat:** se név, se kártyakód, se nyugta.
+  A feltöltős kártyákról csak a NovoHost kártya-ID, az egyenleg és a
+  mozgások (összeg, időpont) jönnek fel; a személyzeti kártyák egyáltalán
+  nem.
 
 ## Oldalak
 

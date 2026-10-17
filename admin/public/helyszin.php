@@ -3,6 +3,7 @@
 
 declare(strict_types=1);
 require __DIR__ . '/lib/app.php';
+require __DIR__ . '/lib/kartyak.php';
 
 $user = pa_require_login();
 $db = pa_db();
@@ -49,7 +50,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             pa_audit($user, 'atnevezve', $s['kulcs'] . ' -> ' . $nev);
         }
     } elseif ($mit === 'torles' && ($_POST['megerosit'] ?? '') === $s['kulcs']) {
-        $db->prepare('DELETE FROM jelentes WHERE helyszin_id = ?')->execute([$id]);
+        foreach (['jelentes', 'kartya', 'kartyamozgas', 'helyszin_allapot'] as $t) {
+            $db->prepare("DELETE FROM $t WHERE helyszin_id = ?")->execute([$id]);
+        }
         $db->prepare('DELETE FROM helyszin WHERE id = ?')->execute([$id]);
         pa_audit($user, 'helyszin_torolve', $s['kulcs']);
         pa_flash('Helyszín törölve: ' . h($s['nev']));
@@ -102,6 +105,73 @@ pa_show_flash();
 <?php endforeach; ?></tr>
 </table></div>
 <p class="muted">Visszaállítás innen szándékosan nem indítható – az kézzel, a gépen történik.</p>
+<?php endif; ?>
+
+<?php
+$kinfo = json_decode((string)(pa_hely_get($id, 'kartya_info')['v'] ?? ''), true) ?: [];
+$egy = pa_hely_get($id, 'egyeztetes');
+$egyd = $egy ? (json_decode((string)$egy['v'], true) ?: []) : [];
+$ig = (int)(pa_hely_get($id, 'naplo_ig')['v'] ?? 0);
+$kst = $db->prepare('SELECT k.*, (SELECT COUNT(*) FROM kartyamozgas m WHERE m.helyszin_id = k.helyszin_id
+                     AND m.kartya_id = k.kartya_id) AS mozgas FROM kartya k WHERE k.helyszin_id = ?
+                     ORDER BY k.utolso_mozgas DESC, k.kartya_id');
+$kst->execute([$id]);
+$kartyak = $kst->fetchAll();
+$mst = $db->prepare('SELECT * FROM kartyamozgas WHERE helyszin_id = ? ORDER BY naplo_id DESC LIMIT 30');
+$mst->execute([$id]);
+$mozgasok = $mst->fetchAll();
+?>
+<h2>Feltöltős kártyák</h2>
+<p class="sub">Kártya-ID a helyszín NovoHostjában; név és kártyakód nem jön fel.
+<?php if ($kinfo): ?>
+  Napló: <?= (int)($kinfo['kurzor'] ?? 0) ?> / <?= h((string)($kinfo['gen'] ?? '?')) ?> sor-ID
+  <?php if (isset($kinfo['gen'], $kinfo['kurzor']) && $kinfo['gen'] > $kinfo['kurzor']): ?>
+    <span class="warn">· előzmény feltöltése folyamatban</span><?php endif; ?>
+  <?php if (!empty($kinfo['pillanatkep'])): ?> · egyenlegek: <?= h((string)$kinfo['pillanatkep']) ?><?php endif; ?>
+<?php else: ?>A gép még nem küldött kártyaadatot (ügynök 2026-10-17.9 vagy újabb kell).<?php endif; ?>
+<?php if (!empty($kinfo['hiba'])): ?><br><span class="bad">Hiba a gépen: <?= h((string)$kinfo['hiba']) ?></span><?php endif; ?></p>
+
+<?php if ($egyd): ?>
+<p>Napi egyeztetés (<?= h($egyd['ido'] ?? '') ?>): <?= (int)($egyd['kartyak'] ?? 0) ?> kártya,
+<?php if (empty($egyd['elteres'])): ?><span class="ok">mind egyezik a naplóval</span>
+<?php else: ?><span class="bad"><?= count($egyd['elteres']) ?> eltér</span>
+  (<?= h(implode(', ', array_map(function ($e) {
+      return 'ID ' . $e['kartya'] . ': ' . $e['egyenleg'] . ' / napló ' . $e['naplo_szerint']; }, $egyd['elteres']))) ?>)
+<?php endif; ?>
+<?php if (!empty($egyd['naplo_nelkul'])): ?> · <?= (int)$egyd['naplo_nelkul'] ?> kártyának nincs naplósora<?php endif; ?></p>
+<?php endif; ?>
+
+<?php if ($kartyak): ?>
+<div class="card scroll"><table>
+<tr><th>Kártya-ID</th><th class="num">Egyenleg (kassza)</th><th class="num">Napló szerint</th><th>Állapot</th>
+<th>Utolsó mozgás</th><th class="num">Mozgások</th></tr>
+<?php foreach ($kartyak as $k): $all = pa_kartya_allapot($k, $ig); ?>
+<tr<?= (int)$k['ervenyes'] === 0 && $k['ervenyes'] !== null ? ' class="muted"' : '' ?>>
+  <td class="mono"><?= (int)$k['kartya_id'] ?></td>
+  <td class="num"><?= $k['egyenleg'] !== null ? h(number_format((float)$k['egyenleg'], 0, ',', ' ')) : '–' ?></td>
+  <td class="num"><?= $k['naplo_egyenleg'] !== null ? h(number_format((float)$k['naplo_egyenleg'], 0, ',', ' ')) : '–' ?></td>
+  <td class="<?= $all === 'ok' ? 'ok' : ($all === 'eltér' ? 'bad' : 'muted') ?>"><?= h($all) ?></td>
+  <td><?= h($k['utolso_mozgas'] ?? '–') ?></td>
+  <td class="num"><?= (int)$k['mozgas'] ?></td>
+</tr>
+<?php endforeach; ?>
+</table></div>
+<?php endif; ?>
+
+<?php if ($mozgasok): ?>
+<h2>Legutóbbi kártyamozgások</h2>
+<div class="card scroll"><table>
+<tr><th>Idő</th><th>Kártya-ID</th><th>Mozgás</th><th class="num">Összeg</th><th class="num">Utána</th></tr>
+<?php foreach ($mozgasok as $mz): ?>
+<tr>
+  <td><?= h($mz['ido'] ?? '–') ?></td>
+  <td class="mono"><?= (int)$mz['kartya_id'] ?></td>
+  <td><?= h(PA_KTIPUS[$mz['tipus']] ?? $mz['tipus']) ?></td>
+  <td class="num"><?= h(number_format((float)$mz['osszeg'], 0, ',', ' ')) ?></td>
+  <td class="num"><?= h(number_format((float)$mz['elotte'] + (float)$mz['osszeg'], 0, ',', ' ')) ?></td>
+</tr>
+<?php endforeach; ?>
+</table></div>
 <?php endif; ?>
 
 <h2>Token</h2>

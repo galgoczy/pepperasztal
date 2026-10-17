@@ -26,7 +26,7 @@ import time
 
 # Minden kiadasnal noveld - a scriptek indulaskor kiirjak, igy egy
 # hibajelentesbol azonnal latszik, melyik verzio fut a gepen.
-AGENT_VERSION = "2026-10-17.8"
+AGENT_VERSION = "2026-10-17.9"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INI_PATH = os.path.join(HERE, "pepper_agent.ini")
@@ -74,6 +74,9 @@ class Config(object):
         }
         # A Pepper Admin (felho) eleresi adatai - jelentes.py
         self.felho = {"url": "", "token": None}
+        # Feltoltos kartyak mozgasai a felhobe (kartyak.py). kezdet: ettol a
+        # KARTYANAPLO.ID-tol kuld eloszor (0 = a teljes elozmeny).
+        self.kartyak = {"kuldes": True, "kezdet": 0, "lap": 300}
         self.loaded_from = None
 
     def security_db_path(self):
@@ -150,6 +153,12 @@ def load_config(path=INI_PATH):
     if cfg.has_section("felho"):
         c.felho["url"] = cfg.get("felho", "url", fallback="").strip().rstrip("/")
         c.felho["token"] = _read_password(cfg, "felho", "token")
+    if cfg.has_section("kartyak"):
+        k = c.kartyak
+        k["kuldes"] = cfg.get("kartyak", "kuldes", fallback="igen").strip().lower() \
+            not in ("nem", "no", "false", "0", "off", "ki")
+        k["kezdet"] = cfg.getint("kartyak", "kezdet", fallback=0)
+        k["lap"] = max(10, min(1000, cfg.getint("kartyak", "lap", fallback=300)))
     if cfg.has_section("backup"):
         b = c.backup
         b["mappa"] = cfg.get("backup", "mappa", fallback=b["mappa"]).strip()

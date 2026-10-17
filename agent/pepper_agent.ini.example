@@ -52,6 +52,13 @@ password_dpapi =
 url = https://pepperadmin.zentopia.io
 token =
 
+[kartyak]
+; Feltoltos kartyak mozgasai es egyenlegei a Pepper Adminnak (nev es
+; kartyakod nelkul). kuldes = nem -> kikapcsolva.
+; kezdet: ettol a KARTYANAPLO.ID-tol kuld (0 = a teljes elozmeny).
+kuldes = igen
+kezdet = 0
+
 [backup]
 ; Helyi mentesek. NE a Program Files ala (VirtualStore-csapda).
 ; A pontos meretet (DB / gbk / archivum) az elso futas naploja kiirja.

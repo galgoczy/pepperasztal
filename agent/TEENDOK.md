@@ -19,6 +19,11 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 
 ## Folyamatban
 
+- **Feltöltős kártyák mozgásai a felhőben (2026-10-17.9):** a `kartyak.py`
+  csak olvasva küldi a `KARTYANAPLO` feltöltős sorait, az egyenlegeket és a
+  napi egyeztetést; az admin helyszín-oldalán látszik. Élesben: célverzió
+  `.9`, utána az előzmény ~1 óra alatt felmegy.
+
 - **Szentkirályi:** átállítva, percenként jelent az adminnak (2026-10-17).
   Most erre az egy helyszínre koncentrálunk.
 - **Admin-belépés:** `admin_users` → `'nev' => 'gmail-cím'`, Google OAuth
