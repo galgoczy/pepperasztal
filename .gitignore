@@ -7,3 +7,5 @@ agent/backup/
 __pycache__/
 *.pyc
 agent/felderites_futas.txt
+admin/public/config.php
+admin/public/build.txt

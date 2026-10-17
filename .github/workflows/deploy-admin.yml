@@ -1,0 +1,155 @@
+# =====================================================================
+#  Pepper Admin feltoltese a Hostingerre (pepperadmin.zentopia.io)
+#  ---------------------------------------------------------------------
+#  Az admin/public/ mappa TARTALMA kerul az FTP-fiok celmappajaba.
+#  A tobbi (agent/, a Vercel-es app) nem megy fel.
+#
+#  INDITAS
+#    Automatikusan, ha az admin/ mappa vagy ez a fajl valtozik (main es
+#    claude/** agon). Kezzel: GitHub -> Actions -> "Pepper Admin feltoltes"
+#    -> Run workflow.
+#
+#  BEALLITAS (egyszer): GitHub -> repo -> Settings -> Secrets and variables
+#    -> Actions
+#    Secrets:   FTP_SERVER    pl. ftp.zentopia.io vagy az IP (hPanel -> FTP)
+#               FTP_USERNAME  az FTP-fiok felhasznaloneve
+#               FTP_PASSWORD  az FTP-fiok jelszava
+#    Variables (nem titok, opcionalis):
+#               FTP_DIR       a celmappa az FTP-fiok gyokerehez kepest.
+#                             Alap: ./  (ha a fiok gyokere maga az aldomain
+#                             webmappaja). A feltoltes utani ellenorzes
+#                             megmondja, ha ez nem stimmel.
+#               ADMIN_URL     alap: https://pepperadmin.zentopia.io
+#
+#  A novohost-cloud deployjanak eles tapasztalatai alapjan: sima FTP (az
+#  FTPS a Hostingernel idotullepesbe futott), 60 mp-es idokorlat, es egy
+#  masodik probalkozas, ha az elso halozati hiba miatt elszall.
+# =====================================================================
+
+name: Pepper Admin feltoltes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'admin/**'
+      - '.github/workflows/deploy-admin.yml'
+
+# Egyszerre csak egy feltoltes fusson, kulonben a szinkron-allapot osszeakad.
+concurrency:
+  group: deploy-admin
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kod letoltese
+        uses: actions/checkout@v4
+
+      - name: Titkok megvannak?
+        env:
+          S: ${{ secrets.FTP_SERVER }}
+          U: ${{ secrets.FTP_USERNAME }}
+          P: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          miss=""
+          [ -n "$S" ] || miss="$miss FTP_SERVER"
+          [ -n "$U" ] || miss="$miss FTP_USERNAME"
+          [ -n "$P" ] || miss="$miss FTP_PASSWORD"
+          if [ -n "$miss" ]; then
+            echo "::error::Hianyzo secret(ek):$miss - Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+
+      - name: PHP szintaxis-ellenorzes
+        # Ha egy PHP fajl hibas, fel se toltjuk - egy elrontott index.php
+        # az egesz oldalt vinne.
+        run: find admin -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Build-azonosito
+        # A health.php ezt adja vissza; a feltoltes utan ebbol latjuk, hogy
+        # tenyleg az uj verzio fut-e (es jo mappaba ment-e).
+        run: echo "${GITHUB_SHA::7}" > admin/public/build.txt
+
+      - name: FTP port ellenorzese
+        continue-on-error: true
+        env:
+          HOST: ${{ secrets.FTP_SERVER }}
+        run: |
+          if timeout 5 bash -c "cat < /dev/null > /dev/tcp/$HOST/21" 2>/dev/null; then
+            echo "21-es port: elerheto"
+          else
+            echo "21-es port: NEM valaszol - ha a feltoltes is elhasal, a hiba halozati."
+          fi
+
+      - name: Feltoltes FTP-n
+        id: ftp1
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:   ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          timeout: 60000
+          local-dir: ./admin/public/
+          server-dir: ${{ vars.FTP_DIR || './' }}
+          # A konfiguraciot SOHA nem irjuk felul es nem toroljuk: csak a
+          # szerveren letezik, benne az adatbazis-jelszo.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/config.php
+            **/config.*.php
+            **/pepperadmin-config.php
+            **/*.md
+
+      - name: Varakozas az ujraprobalas elott
+        if: steps.ftp1.outcome == 'failure'
+        run: sleep 25
+
+      - name: Feltoltes FTP-n (2. proba)
+        if: steps.ftp1.outcome == 'failure'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:   ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          timeout: 60000
+          local-dir: ./admin/public/
+          server-dir: ${{ vars.FTP_DIR || './' }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/config.php
+            **/config.*.php
+            **/pepperadmin-config.php
+            **/*.md
+
+      - name: Ellenorzes - az uj verzio fut?
+        env:
+          URL: ${{ vars.ADMIN_URL || 'https://pepperadmin.zentopia.io' }}
+        run: |
+          want="${GITHUB_SHA::7}"
+          for i in 1 2 3 4 5 6; do
+            body=$(curl -s --max-time 10 "$URL/health.php" || true)
+            got=$(printf '%s' "$body" | jq -r '.build // empty' 2>/dev/null || true)
+            if [ "$got" = "$want" ]; then
+              echo "OK: $URL a $want buildet futtatja."
+              printf '%s\n' "$body" | jq '{version, build, php, config, db}'
+              cfg=$(printf '%s' "$body" | jq -r '.config')
+              db=$(printf '%s' "$body" | jq -r '.db')
+              [ "$cfg" = "true" ] || echo "::warning::A konfiguracio meg hianyzik a szerveren (lasd admin/README.md)."
+              [ "$cfg" != "true" ] || [ "$db" = "ok" ] || echo "::warning::Az adatbazis-kapcsolat nem mukodik: $db"
+              exit 0
+            fi
+            echo "Meg nem az uj build ($i/6): kapott='${got:-semmi}'"
+            sleep 10
+          done
+          echo "::error::A feltoltes lefutott, de $URL/health.php nem a $want buildet adja. Valoszinuleg rossz a celmappa: allitsd be az FTP_DIR valtozot (lasd admin/README.md)."
+          exit 1
