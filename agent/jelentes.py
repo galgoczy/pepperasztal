@@ -29,6 +29,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import socket
 import ssl
 import sys
@@ -36,7 +37,7 @@ import time
 import urllib.error
 import urllib.request
 
-from common import (AGENT_VERSION, HERE, dpapi_protect, is_windows,
+from common import (AGENT_VERSION, HERE, INI_PATH, dpapi_protect, is_windows,
                     load_config, log, parse_list, run_isql, set_log)
 
 LOG = os.path.join(HERE, "jelentes_log.txt")
@@ -120,13 +121,89 @@ def post(url, token, data):
             return {"ok": False, "hiba": "HTTP {0}".format(e.code)}
 
 
+def tisztit_token(s):
+    """Elfogadja az admin teljes 'token = ...' soranak bemasolasat is,
+    szokozzel, sortoressel, idezojellel. Visszaad: (token vagy None, ok)."""
+    s = s.strip().strip("﻿")
+    m = re.match(r"(?i)^\s*token\s*[=:]\s*", s)
+    if m:
+        s = s[m.end():]
+    s = re.sub(r"[\s\"']", "", s)
+    if re.match(r"^[0-9a-fA-F]{64}$", s):
+        return s.lower(), None
+    hex_db = len(re.findall(r"[0-9a-fA-F]", s))
+    ok = "{0} karaktert kaptam, ebbol {1} hexa (0-9, a-f).".format(len(s), hex_db)
+    if any(ord(ch) < 32 for ch in s):
+        ok += (" Vezerlokaraktert is kaptam: a rejtett bevitelnel a Ctrl+V nem "
+               "illeszt be. Ird a tokent az ini [felho] szakaszaba 'token = ...' "
+               "sorkent, es futtasd ujra a parancsot.")
+    return None, ok
+
+
+def _ini_olvas():
+    with open(INI_PATH, "rb") as f:
+        raw = f.read()
+    for enc in ("utf-8-sig", "cp1250"):
+        try:
+            return raw.decode(enc), enc, raw.startswith(b"\xef\xbb\xbf")
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("latin-1"), "latin-1", False
+
+
+def _ini_token_sor(szoveg):
+    """A [felho] szakasz nyilt 'token =' sora: (sorindex, ertek) vagy None."""
+    szakasz = None
+    for i, sor in enumerate(szoveg.splitlines()):
+        s = sor.strip()
+        if s.startswith("[") and s.endswith("]"):
+            szakasz = s[1:-1].strip().lower()
+        elif szakasz == "felho":
+            m = re.match(r"(?i)^token\s*[=:]\s*(.*)$", s)
+            if m and m.group(1).strip():
+                return i, m.group(1).strip()
+    return None
+
+
 def cmd_titkosit():
-    import getpass
+    """A token DPAPI-val. Ha az ini [felho] szakaszaban van nyilt 'token ='
+    sor, azt titkositja es a helyere irja (nem kell bemasolni semmit);
+    kulonben bekeri."""
     if not is_windows():
         sys.exit("A DPAPI csak Windows-on erheto el.")
-    t = getpass.getpass("Token (nem jelenik meg): ").strip()
-    if len(t) != 64:
-        sys.exit("A token 64 karakteres hex szoveg - ellenorizd.")
+    talalat = None
+    if os.path.exists(INI_PATH):
+        szoveg, enc, bom = _ini_olvas()
+        talalat = _ini_token_sor(szoveg)
+    if talalat:
+        idx, ertek = talalat
+        t, ok = tisztit_token(ertek)
+        if not t:
+            sys.exit("A pepper_agent.ini 'token =' soraban nem 64 jegyu hexa token "
+                     "van. " + ok)
+        sorok = szoveg.splitlines(True)
+        veg = "\r\n" if sorok[idx].endswith("\r\n") else "\n"
+        sorok[idx] = "token_dpapi = {0}{1}".format(dpapi_protect(t), veg)
+        # Az esetleges ures 'token_dpapi =' sablonsor felesleges.
+        uj = [s for j, s in enumerate(sorok)
+              if j == idx or not re.match(r"(?i)^\s*token_dpapi\s*[=:]\s*$", s)]
+        adat = "".join(uj).encode(enc if enc != "utf-8-sig" else "utf-8")
+        if bom:
+            adat = b"\xef\xbb\xbf" + adat
+        with open(INI_PATH, "wb") as f:
+            f.write(adat)
+        print("Kesz: a pepper_agent.ini-ben a nyilt token helyen most mar "
+              "'token_dpapi = ...' all.")
+        print("Ellenorzes: python jelentes.py --proba")
+        return
+
+    import getpass
+    print("Tipp: egyszerubb, ha a pepper_agent.ini [felho] szakaszaba beirod a\n"
+          "'token = ...' sort, es ugy futtatod ujra ezt a parancsot.\n")
+    t, ok = tisztit_token(getpass.getpass(
+        "Token (nem jelenik meg; jobb egergombbal illeszd be): "))
+    if not t:
+        sys.exit("Ez nem 64 jegyu hexa token. " + ok)
     print("\ntoken_dpapi = {0}\n".format(dpapi_protect(t)))
     print("Ezt a sort tedd a pepper_agent.ini [felho] szakaszaba, a nyilt "
           "'token =' sort pedig torold.")

@@ -47,9 +47,10 @@ password_dpapi =
 [felho]
 ; A Pepper Admin cime es a helyszin tokenje. A tokent az adminban kapod,
 ; amikor felveszed a helyszint (csak egyszer latszik). Titkositas:
-;   python jelentes.py --titkosit   -> token_dpapi = ... sor ide
+;   ird be ide a 'token = <az adminban kapott token>' sort, majd
+;   python jelentes.py --titkosit   -> helyben 'token_dpapi = ...' lesz belole
 url = https://pepperadmin.zentopia.io
-token_dpapi =
+token =
 
 [backup]
 ; Helyi mentesek. NE a Program Files ala (VirtualStore-csapda).

@@ -216,8 +216,10 @@ pl. `RSR`. A megjelenő tokent másold ki, mert csak egyszer látszik.
 3. Jelszavak és token titkosítása:
    - `python setup_users.py titkosit` → a SYSDBA jelszó, a kiírt sor a
      `[sysdba]` szakaszba;
-   - `python jelentes.py --titkosit` → a token, a kiírt `token_dpapi = …`
-     sor a `[felho]` szakaszba; a nyílt `token` sort töröld.
+   - `python jelentes.py --titkosit` → a `[felho]` szakaszba előbb beírt
+     `token = …` sort helyben titkosítja (`token_dpapi = …` lesz belőle).
+     Ha nincs ilyen sor, bekéri a tokent: a rejtett bevitelnél jobb
+     egérgombbal illeszd be, a Ctrl+V ott nem működik.
 4. Mentés: `install_backup.bat`, majd `schtasks /Run /TN "PepperHouse-Mentes"`.
    A `mentes_log.txt` végén a „tömörítés kész" sornak kell állnia.
 5. Felhasználók:

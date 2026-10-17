@@ -19,7 +19,7 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 
 ## Folyamatban
 
-- **Szentkirályi átállítása az új verzióra (2026-10-17.5):** fájlcsere,
+- **Szentkirályi átállítása az új verzióra (2026-10-17.6):** fájlcsere,
   `setup_users.py letrehoz` (szűkíti a `PEPPER_OLVAS`-t), `[felho]` az
   ini-be, `install_jelentes.bat`, újra az `install_backup.bat` (napközbeni
   mentés). Lépések: README, 7. pont.
