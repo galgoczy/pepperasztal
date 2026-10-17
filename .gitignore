@@ -6,3 +6,4 @@ agent/felderites_*.txt
 agent/backup/
 __pycache__/
 *.pyc
+agent/felderites_futas.txt

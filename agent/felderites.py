@@ -99,15 +99,37 @@ class DB(object):
         self.user_key = user_key
         self.errors = []
         self.last_out = ""
+        self.t0 = time.time()
+        self.progress_path = os.path.join(HERE, "felderites_futas.txt")
+        try:
+            open(self.progress_path, "w").close()
+        except Exception:
+            self.progress_path = None
 
     def raw(self, sql):
         full = "SET LIST ON;\n" + sql
         assert_readonly(full)
+        t = time.time()
         out, err = run_isql(self.cfg, full, user_key=self.user_key)
         self.last_out = out
+        self.progress("{0:5.1f} mp  {1}".format(
+            time.time() - t, " ".join(sql.split())[:70]))
         if err:
             self.errors.append((sql.strip()[:120], err))
         return out, err
+
+    def progress(self, msg):
+        """Futas kozbeni allapot a konzolra es a felderites_futas.txt-be,
+        hogy egy lassu vagy megakadt lekerdezes azonnal latsszon."""
+        line = "[{0:6.1f}] {1}".format(time.time() - self.t0, msg)
+        sys.stderr.write(line + "\n")
+        sys.stderr.flush()
+        if self.progress_path:
+            try:
+                with open(self.progress_path, "a", encoding="utf-8") as f:
+                    f.write(line + "\n")
+            except Exception:
+                pass
 
     def rows(self, sql, cols):
         out, err = self.raw(sql)
@@ -312,125 +334,183 @@ def sec_kornyezet(cfg, rep, tools_ok, db):
 
 
 # ===========================================================================
-# 1. KKODID -> tetelesen latszik-e a vasarlas
+# 1-2. Fizetesek: egyszeru lekerdezesek, a parositas Pythonban
 # ===========================================================================
+#
+# Az IB6 optimalizalo a beagyazott (korrelalt) EXISTS lekerdezeseket
+# rosszul viseli: elesben egy kis adatbazison is percekig futott. Ezert az
+# adatbazistol csak egyszeru, indexelt tartomany-lekerdezeseket kerunk
+# (NYUGTAFIZETES.FEJ, NYUGTATETEL.FEJ), illetve kis tablakat olvasunk be
+# egeszben (KARTYATORZS, KARTYANAPLO, ETELFAJ). A parositas a memoriaban
+# tortenik. Nev es kartyakod csak itt, osszevetesre kerul elo - a
+# jelentesbe nem kerul.
 
-def sec_kkodid(db, rep, lo, lo_kicsi, nyugtak):
+def _i(v):
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
+def _f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _s(v):
+    return (v or "").strip()
+
+
+def load_fizetesek(db, lo, lo_kicsi):
+    d = {}
+    # VIP-fizetesek a nagy ablakban - csak ezek a sorok (FEJ index).
+    rows, e = db.rows(
+        "SELECT N.FEJ AS FEJ, N.FIZTIP AS FT, N.KKODID AS KID, N.FORINT AS "
+        "FORINT, N.KKOD AS KKOD, N.KTULAJDONOS AS KTUL FROM NYUGTAFIZETES N "
+        "WHERE N.FEJ > {0} AND N.FIZTIPID = 10;".format(lo),
+        ["FEJ", "FT", "KID", "FORINT", "KKOD", "KTUL"])
+    d["vip_err"] = e
+    d["vip"] = [r for r in rows if _s(r.get("FT")) == "FIZ"]
+
+    # Kartyak (nehany tucat sor).
+    rows, e = db.rows("SELECT K.ID AS ID, K.TIPUS AS TIPUS, K.KARTYA AS "
+                      "KOD, K.NEV AS NEV FROM KARTYATORZS K;",
+                      ["ID", "TIPUS", "KOD", "NEV"])
+    d["kartyak"] = dict((_i(r.get("ID")), r) for r in rows)
+
+    # Kartyanaplo egeszben (nehany tizezer sor).
+    rows, e = db.rows("SELECT L.ID AS ID, L.KARTYA AS K, L.TTIPUS AS T, "
+                      "L.OSSZEG AS O, L.AKT AS A FROM KARTYANAPLO L;",
+                      ["ID", "K", "T", "O", "A"])
+    d["naplo"] = rows
+
+    # A kis ablak minden fizetese (vegyes fizeteshez) es tetele.
+    rows, e = db.rows(
+        "SELECT N.FEJ AS FEJ, N.FIZTIP AS FT, N.FIZTIPID AS FID, N.ELOJEL AS "
+        "EL FROM NYUGTAFIZETES N WHERE N.FEJ > {0};".format(lo_kicsi),
+        ["FEJ", "FT", "FID", "EL"])
+    d["fiz_kicsi"] = rows
+    rows, e = db.rows("SELECT T.FEJ AS FEJ, T.EAZO AS E FROM NYUGTATETEL T "
+                      "WHERE T.FEJ > {0};".format(lo_kicsi), ["FEJ", "E"])
+    d["tetel_kicsi"] = rows
+    rows, e = db.rows("SELECT E.ID AS ID, E.NEV AS NEV FROM ETELFAJ E;",
+                      ["ID", "NEV"])
+    d["etelfaj"] = dict((_i(r.get("ID")), _s(r.get("NEV"))) for r in rows)
+    return d
+
+
+def sec_kkodid(d, rep, lo, lo_kicsi, nyugtak):
     rep.h("1. TETELES VASARLASTORTENET (NYUGTAFIZETES.KKODID)")
-    rep.text("Ablak: az utolso {0} nyugta (NYUGTAFEJ.ID > {1}).".format(
-        fmt(nyugtak), fmt(lo)))
-    base = ("SELECT COUNT(*) AS DB FROM NYUGTAFIZETES N "
-            "WHERE N.FEJ > {0} AND {1}").format(lo, VIP)
-
-    ossz, e = db.num(base + ";")
+    rep.text("Nagy ablak: az utolso {0} nyugta (NYUGTAFEJ.ID > {1}); "
+             "kis ablak: NYUGTAFEJ.ID > {2}.".format(fmt(nyugtak), fmt(lo),
+                                                     fmt(lo_kicsi)))
+    rep.err(d["vip_err"])
+    vip, kartyak = d["vip"], d["kartyak"]
+    ossz = len(vip)
     rep.kv("VIP-fizetes sor", ossz)
-    rep.err(e)
     if not ossz:
         rep.verdict("Az ablakban nincs VIP-fizetes - novelj --nyugtak-ot.")
         return
 
-    nn, e = db.num(base + " AND N.KKODID IS NOT NULL;")
-    rep.kv("  ebbol KKODID kitoltve", "{0}  ({1})".format(fmt(nn), pct(nn, ossz)))
-    mm, e = db.rows(("SELECT MIN(N.KKODID) AS MN, MAX(N.KKODID) AS MX "
-                     "FROM NYUGTAFIZETES N WHERE N.FEJ > {0} AND {1};"
-                     ).format(lo, VIP), ["MN", "MX"])
-    if mm:
-        rep.kv("  KKODID tartomany", "{0} .. {1}".format(
-            mm[0].get("MN"), mm[0].get("MX")))
-
-    kid, e = db.num(base + " AND EXISTS (SELECT 1 FROM KARTYATORZS K "
-                           "WHERE K.ID = N.KKODID);")
+    kids = [_i(v.get("KID")) for v in vip]
+    nn = sum(1 for k in kids if k is not None)
+    rep.kv("  ebbol KKODID kitoltve", "{0}  ({1})".format(fmt(nn),
+                                                          pct(nn, ossz)))
+    present = [k for k in kids if k is not None]
+    if present:
+        rep.kv("  KKODID tartomany", "{0} .. {1}".format(min(present),
+                                                         max(present)))
+    kid = sum(1 for k in kids if k in kartyak)
     rep.kv("  KKODID = egy letezo KARTYATORZS.ID",
            "{0}  ({1})".format(fmt(kid), pct(kid, ossz)))
-    kkod, e = db.num(base + " AND EXISTS (SELECT 1 FROM KARTYATORZS K "
-                            "WHERE K.ID = N.KKODID AND K.KARTYA = N.KKOD);")
+    kkod = sum(1 for v in vip if _i(v.get("KID")) in kartyak and
+               _s(kartyak[_i(v.get("KID"))].get("KOD")) == _s(v.get("KKOD")))
     rep.kv("  ... es KKOD = a kartya kodja", "{0}  ({1})".format(
         fmt(kkod), pct(kkod, ossz)))
-    knev, e = db.num(base + " AND EXISTS (SELECT 1 FROM KARTYATORZS K "
-                            "WHERE K.ID = N.KKODID AND K.NEV = N.KTULAJDONOS);")
+    knev = sum(1 for v in vip if _i(v.get("KID")) in kartyak and
+               _s(kartyak[_i(v.get("KID"))].get("NEV")) == _s(v.get("KTUL")))
     rep.kv("  ... es KTULAJDONOS = a kartya neve", "{0}  ({1})".format(
         fmt(knev), pct(knev, ossz)))
 
-    # Alternativ hipotezis: a KKODID a naplosorra mutat, nem a kartyara.
-    nid, e = db.num(base + " AND EXISTS (SELECT 1 FROM KARTYANAPLO L "
-                           "WHERE L.ID = N.KKODID);")
+    naplo_ids = set(_i(r.get("ID")) for r in d["naplo"])
+    nid = sum(1 for k in kids if k in naplo_ids)
     rep.kv("  (ellenproba) KKODID = egy KARTYANAPLO.ID", fmt(nid))
 
-    # Osszeg-egyezes a naplo FK soraval. A KARTYANAPLO.KARTYA-n nincs
-    # index, ezert ez KISEBB ablakon fut.
-    kb = ("SELECT COUNT(*) AS DB FROM NYUGTAFIZETES N "
-          "WHERE N.FEJ > {0} AND {1}").format(lo_kicsi, VIP)
-    kossz, e = db.num(kb + ";")
-    kegy, e = db.num(kb + " AND EXISTS (SELECT 1 FROM KARTYANAPLO L "
-                          "WHERE L.KARTYA = N.KKODID AND L.TTIPUS = 'FK' "
-                          "AND (L.OSSZEG = N.FORINT OR L.OSSZEG = -N.FORINT));")
+    fk = set()
+    for r in d["naplo"]:
+        if _s(r.get("T")) == "FK" and _f(r.get("O")) is not None:
+            fk.add((_i(r.get("K")), int(round(abs(_f(r.get("O")))))))
+    kicsi = [v for v in vip if (_i(v.get("FEJ")) or 0) > lo_kicsi]
+    kegy = sum(1 for v in kicsi if _f(v.get("FORINT")) is not None and
+               (_i(v.get("KID")), int(round(abs(_f(v.get("FORINT")))))) in fk)
     rep.kv("  kis ablakban: egyezo FK naplosor",
-           "{0} / {1}  ({2})".format(fmt(kegy), fmt(kossz), pct(kegy, kossz)))
+           "{0} / {1}  ({2})".format(fmt(kegy), fmt(len(kicsi)),
+                                     pct(kegy, len(kicsi))))
 
-    tet, e = db.num(base + " AND EXISTS (SELECT 1 FROM NYUGTATETEL T "
-                           "WHERE T.FEJ = N.FEJ);")
-    rep.kv("  van NYUGTATETEL a nyugtan", "{0}  ({1})".format(
-        fmt(tet), pct(tet, ossz)))
+    tetel_fej = set(_i(t.get("FEJ")) for t in d["tetel_kicsi"])
+    tet = sum(1 for v in kicsi if _i(v.get("FEJ")) in tetel_fej)
+    rep.kv("  kis ablakban: van NYUGTATETEL a nyugtan",
+           "{0} / {1}  ({2})".format(fmt(tet), fmt(len(kicsi)),
+                                     pct(tet, len(kicsi))))
 
-    ok = kid is not None and ossz and kid >= 0.95 * ossz
-    if ok and tet and tet >= 0.95 * ossz:
+    ok = kid >= 0.95 * ossz
+    tet_ok = kicsi and tet >= 0.95 * len(kicsi)
+    if ok and tet_ok:
         rep.verdict("IGEN - a KKODID a kartyara mutat, a nyugtan tetelek "
                     "vannak. Tetelalapu pontgyujtes megoldhato.")
     elif ok:
-        rep.verdict("A KKODID a kartyara mutat, de a tetelek hianyosak - "
-                    "nezd meg kezzel.")
+        rep.verdict("A KKODID a kartyara mutat, de a tetelek hianyosak (vagy "
+                    "a kis ablakban nincs VIP-fizetes) - nezd meg kezzel.")
     else:
         rep.verdict("NEM bizonyitott. A pontgyujtest ertekalapura kell "
                     "tervezni (pl. 100 Ft = 1 pont) a KARTYANAPLO-bol.")
 
     # Mit vesznek VIP-pel - csak etelnevek, nincs vendegadat.
     rep.sub("Leggyakoribb tetelek VIP-pel fizetett nyugtakon (kis ablak)")
-    rows, e = db.rows(
-        ("SELECT E.NEV AS NEV, COUNT(*) AS DB FROM NYUGTATETEL T "
-         "JOIN ETELFAJ E ON E.ID = T.EAZO WHERE T.FEJ > {0} AND EXISTS "
-         "(SELECT 1 FROM NYUGTAFIZETES N WHERE N.FEJ = T.FEJ AND {1}) "
-         "GROUP BY E.NEV;").format(lo_kicsi, VIP), ["NEV", "DB"])
-    rep.err(e)
-    rows.sort(key=lambda r: -int(r.get("DB") or 0))
-    for r in rows[:15]:
-        rep.text("{0:>6}  {1}".format(r.get("DB"), r.get("NEV")))
+    vip_fej = set(_i(v.get("FEJ")) for v in kicsi)
+    cnt = {}
+    for t in d["tetel_kicsi"]:
+        if _i(t.get("FEJ")) in vip_fej:
+            nev = d["etelfaj"].get(_i(t.get("E")), "?")
+            cnt[nev] = cnt.get(nev, 0) + 1
+    for nev, n in sorted(cnt.items(), key=lambda x: -x[1])[:15]:
+        rep.text("{0:>6}  {1}".format(n, nev))
+    if not cnt:
+        rep.text("(nincs adat a kis ablakban)")
 
 
-# ===========================================================================
-# 2. Reszfizetes es minusz egyenleg
-# ===========================================================================
-
-def sec_reszfizetes(db, rep, lo):
+def sec_reszfizetes(d, rep, db):
     rep.h("2. RESZFIZETES ES MINUSZ EGYENLEG")
-    vf, e = db.num(("SELECT COUNT(DISTINCT N.FEJ) AS DB FROM NYUGTAFIZETES N "
-                    "WHERE N.FEJ > {0} AND {1};").format(lo, VIP))
-    rep.err(e)
-    vegy, e = db.num((
-        "SELECT COUNT(DISTINCT N.FEJ) AS DB FROM NYUGTAFIZETES N "
-        "WHERE N.FEJ > {0} AND {1} AND EXISTS (SELECT 1 FROM NYUGTAFIZETES M "
-        "WHERE M.FEJ = N.FEJ AND NOT (M.FIZTIP = 'FIZ' AND M.FIZTIPID = 10));"
-    ).format(lo, VIP))
+    rep.text("A kis ablak alapjan.")
+    by_fej = {}
+    for r in d["fiz_kicsi"]:
+        by_fej.setdefault(_i(r.get("FEJ")), []).append(r)
+
+    def is_vip(r):
+        return _s(r.get("FT")) == "FIZ" and _i(r.get("FID")) == 10
+
+    vip_fej = [f for f, rs in by_fej.items() if any(is_vip(r) for r in rs)]
+    vegyes, bontas = 0, {}
+    for f in vip_fej:
+        mas = [r for r in by_fej[f] if not is_vip(r)]
+        if mas:
+            vegyes += 1
+        for r in mas:
+            k = (_s(r.get("FT")), _i(r.get("FID")), _i(r.get("EL")))
+            bontas[k] = bontas.get(k, 0) + 1
+    vf = len(vip_fej)
     rep.kv("Nyugta VIP-fizetessel", vf)
     rep.kv("  ebbol mas fizetesi mod is van rajta",
-           "{0}  ({1})".format(fmt(vegy), pct(vegy, vf)))
-
-    rows, e = db.rows((
-        "SELECT M.FIZTIP AS FIZTIP, M.FIZTIPID AS FIZTIPID, M.ELOJEL AS ELOJEL,"
-        " COUNT(*) AS DB FROM NYUGTAFIZETES M WHERE M.FEJ > {0} AND NOT "
-        "(M.FIZTIP = 'FIZ' AND M.FIZTIPID = 10) AND EXISTS (SELECT 1 FROM "
-        "NYUGTAFIZETES N WHERE N.FEJ = M.FEJ AND {1}) "
-        "GROUP BY M.FIZTIP, M.FIZTIPID, M.ELOJEL;").format(lo, VIP),
-        ["FIZTIP", "FIZTIPID", "ELOJEL", "DB"])
-    if rows:
+           "{0}  ({1})".format(fmt(vegyes), pct(vegyes, vf)))
+    if bontas:
         rep.sub("A VIP melletti fizetesi sorok bontasa")
         rep.text("FIZTIP  FIZTIPID  ELOJEL      DB   (FIZ/0 keszp., FIZ/3 "
                  "bankkartya, FIZ/8 SZEP)")
-        for r in rows:
-            rep.text("{0:<7} {1:>8}  {2:>6}  {3:>6}".format(
-                r.get("FIZTIP"), r.get("FIZTIPID"), r.get("ELOJEL"),
-                r.get("DB")))
-
-    if vegy:
+        for (ft, fid, el), n in sorted(bontas.items(), key=lambda x: -x[1]):
+            rep.text("{0:<7} {1:>8}  {2:>6}  {3:>6}".format(ft, fid, el, n))
+    if vegyes:
         rep.verdict("Van vegyes fizetes. Ha a bontasban pozitiv ELOJEL-u "
                     "keszpenz/kartya sor van, a kassza tud reszfizetest "
                     "(ha csak negativ, az a visszajaro).")
@@ -439,27 +519,34 @@ def sec_reszfizetes(db, rep, lo):
                     "Az appban jelezni kell, ha az egyenleg nem eleg.")
 
     rep.sub("Minusz egyenleg")
-    pos, e = db.num("SELECT COUNT(*) AS DB FROM KARTYANAPLO "
-                    "WHERE TTIPUS = 'FK' AND OSSZEG > 0;")
-    rep.kv("FK sor pozitiv osszeggel (elojel-ellenorzes)", pos)
-    rows, e = db.rows(
-        "SELECT K.TIPUS AS TIPUS, COUNT(*) AS DB FROM KARTYANAPLO L "
-        "JOIN KARTYATORZS K ON K.ID = L.KARTYA WHERE L.TTIPUS = 'FK' "
-        "AND L.AKT + L.OSSZEG < 0 GROUP BY K.TIPUS;", ["TIPUS", "DB"])
-    rep.err(e)
-    if rows:
-        for r in rows:
-            rep.kv("  FK utan minuszba ment (kartyatipus {0})".format(
-                r.get("TIPUS")), r.get("DB"))
+    fk = [r for r in d["naplo"] if _s(r.get("T")) == "FK"]
+    pos = sum(1 for r in fk if (_f(r.get("O")) or 0) > 0)
+    rep.kv("FK sor osszesen / pozitiv osszeggel", "{0} / {1}".format(
+        fmt(len(fk)), fmt(pos)))
+    minusz = {}
+    for r in fk:
+        o, a = _f(r.get("O")), _f(r.get("A"))
+        if o is not None and a is not None and a + o < -0.5:
+            k = d["kartyak"].get(_i(r.get("K")), {})
+            t = _s(k.get("TIPUS")) or "?"
+            minusz[t] = minusz.get(t, 0) + 1
+    if minusz:
+        for t, n in sorted(minusz.items()):
+            rep.kv("  FK utan minuszba ment (kartyatipus {0})".format(t), n)
     else:
         rep.kv("  FK utan minuszba ment", 0)
     neg, e = db.num("SELECT COUNT(*) AS DB FROM KARTYATORZS WHERE AKT_KP < 0;")
     rep.kv("Kartya most minuszban (AKT_KP < 0)", neg)
-    if rows and pos == 0:
-        rep.verdict("A kassza ENGEDI a minuszt (legalabb egyes tipusoknal). "
-                    "Prepaid-nel ezt le kell zarni - limit vagy kezeloi "
-                    "szabaly kell.")
-    elif pos == 0:
+    # A 4-es tipus a szemelyzeti kartya (ENGEDMENY=100, 0 Ft-ot fizet) -
+    # az o minuszuk nem mond semmit a vendegkartyakrol.
+    vendeg_minusz = dict((t, n) for t, n in minusz.items() if t != "4")
+    if vendeg_minusz and pos == 0:
+        rep.verdict("A kassza ENGEDI a minuszt vendegkartyan is. Prepaid-nel "
+                    "ezt le kell zarni - limit vagy kezeloi szabaly kell.")
+    elif minusz and pos == 0:
+        rep.verdict("Csak szemelyzeti kartya (4-es tipus) ment minuszba - "
+                    "vendegkartyan nem fordult elo.")
+    elif fk and pos == 0:
         rep.verdict("Soha nem ment minuszba: a kassza valoszinuleg nem "
                     "engedi tulkolteni.")
 
@@ -781,8 +868,9 @@ def main():
                     help="alapbol PEPPER_OLVAS, ha van jelszava az ini-ben")
     ap.add_argument("--nyugtak", type=int, default=100000,
                     help="ennyi utolso nyugtat vizsgal (alap: 100000)")
-    ap.add_argument("--kis-ablak", type=int, default=5000,
-                    help="a dragabb lekerdezesek ablaka (alap: 5000)")
+    ap.add_argument("--kis-ablak", type=int, default=10000,
+                    help="a reszletes (teteles) vizsgalat ablaka, nyugtaban "
+                         "(alap: 10000)")
     args = ap.parse_args()
 
     cfg = load_config()
@@ -809,8 +897,10 @@ def main():
                   "A jelentes nem tartalmaz nevet, kartyakodot vagy mas "
                   "szemelyes adatot."]
 
+    db.progress("-- 0. kornyezet")
     sec_kornyezet(cfg, rep, tools_ok, db)
 
+    db.progress("-- 1-2. fizetesek")
     mx, err = db.num("SELECT MAX(ID) AS MX FROM NYUGTAFEJ;", "MX")
     if mx is None:
         rep.h("NYUGTAFEJ nem olvashato - az 1-2. szakasz kimarad")
@@ -818,12 +908,18 @@ def main():
     else:
         lo = max(0, mx - args.nyugtak)
         lo_kicsi = max(0, mx - args.kis_ablak)
-        sec_kkodid(db, rep, lo, lo_kicsi, args.nyugtak)
-        sec_reszfizetes(db, rep, lo)
+        d = load_fizetesek(db, lo, lo_kicsi)
+        sec_kkodid(d, rep, lo, lo_kicsi, args.nyugtak)
+        sec_reszfizetes(d, rep, db)
+    db.progress("-- 3. EAN")
     sec_ean(db, rep)
+    db.progress("-- 4. etlap")
     sec_etlap(db, rep)
+    db.progress("-- 5-7. kartyak")
     sec_kartyak(db, rep)
+    db.progress("-- 8. iras")
     sec_iras(db, rep)
+    db.progress("-- kesz")
 
     if db.errors:
         rep.h("ISQL HIBAK OSSZESITVE ({0})".format(len(db.errors)))
