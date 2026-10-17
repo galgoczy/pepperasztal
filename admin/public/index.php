@@ -61,7 +61,7 @@ function row(string $label, string $value, bool $good): string
     <?= row('Verzió', $st['version'], true) ?>
     <?= row('Build (commit)', $st['build'], true) ?>
     <?= row('PHP', $st['php'], version_compare($st['php'], '7.4', '>=')) ?>
-    <?= row('Konfiguráció', $st['config'] ? 'megvan' : 'hiányzik', $st['config']) ?>
+    <?= row('Konfiguráció', $st['config'] ? 'megvan – ' . $st['config_hely'] : 'hiányzik', $st['config']) ?>
     <?= row('Adatbázis', DB_LABEL[$st['db']] ?? $st['db'], $st['db'] === 'ok') ?>
   </table>
 </main>

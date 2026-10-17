@@ -3,28 +3,50 @@
  * Pepper Admin - kozos betoltes.
  *
  * A konfiguracio (adatbazis, kesobb tokenek) egy PHP fajl, ami egy tombot
- * ad vissza. Soha nincs a gitben, es a deploy sem irja felul. Ket helyen
- * keressuk, ebben a sorrendben:
- *   1. a webgyokeren KIVUL: ../pepperadmin-config.php  (ha az FTP oda enged)
- *   2. a webgyokerben:      ./config.php  (a .htaccess tiltja a letoltest)
+ * ad vissza. Soha nincs a gitben, es a deploy sem irja felul. Keresesi
+ * sorrend:
+ *   1. pepperadmin-config.php a webmappa FELETT, 1-4 szinttel feljebb
+ *      (Hostingeren az aldomain mappaja gyakran a fodomain public_html-je
+ *      alatt van, igy a "public_html folott" ket szinttel feljebb esik)
+ *   2. config.php a webmappaban (a .htaccess tiltja a letoltest)
  */
 
 declare(strict_types=1);
 
-const PA_VERSION = '0.1.0';
+const PA_VERSION = '0.1.1';
+
+/** Hol talaltuk a konfiguraciot: [utvonal, hely-leiras] vagy [null, null]. */
+function pa_config_location(): array
+{
+    static $loc = null;
+    if ($loc !== null) {
+        return $loc;
+    }
+    $webroot = dirname(__DIR__);
+    $dir = $webroot;
+    for ($up = 1; $up <= 4; $up++) {
+        $parent = dirname($dir);
+        if ($parent === $dir) {
+            break;               // elertuk a fajlrendszer gyokeret
+        }
+        $dir = $parent;
+        // Az open_basedir a felsobb szinteken tilthatja a hozzaferest -
+        // ilyenkor csendben tovabblepunk.
+        $p = $dir . '/pepperadmin-config.php';
+        if (@is_file($p)) {
+            return $loc = [$p, "a webmappa felett {$up} szinttel"];
+        }
+    }
+    $p = $webroot . '/config.php';
+    if (is_file($p)) {
+        return $loc = [$p, 'a webmappaban (config.php)'];
+    }
+    return $loc = [null, null];
+}
 
 function pa_config_path(): ?string
 {
-    $candidates = [
-        dirname(__DIR__, 2) . '/pepperadmin-config.php',
-        dirname(__DIR__) . '/config.php',
-    ];
-    foreach ($candidates as $p) {
-        if (is_file($p)) {
-            return $p;
-        }
-    }
-    return null;
+    return pa_config_location()[0];
 }
 
 function pa_config(): array
@@ -66,6 +88,8 @@ function pa_status(): array
         'build'   => $build !== false ? trim($build) : 'helyi',
         'php'     => PHP_VERSION,
         'config'  => pa_config_path() !== null,
+        // Csak relativ hely ("a webmappa felett 2 szinttel"), szerverutvonal nem.
+        'config_hely' => pa_config_location()[1],
         'db'      => 'nincs beallitva',
     ];
     if ($st['config']) {

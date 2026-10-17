@@ -35,7 +35,7 @@ célmappa. Ilyenkor állítsd be például így: `public_html/`.
 A `config.example.php` mintája alapján hozd létre a hPanel
 Fájlkezelőjében, az alábbi két hely közül az elsőre, ahová írni tudsz:
 
-1. **a webmappa fölé**, `pepperadmin-config.php` néven (ajánlott: így a
+1. **a webmappa fölé** (1–4 szinttel feljebb bárhová), `pepperadmin-config.php` néven (ajánlott: így a
    webről semmilyen módon nem érhető el);
 2. **a webmappába**, `config.php` néven (a `.htaccess` tiltja a letöltését,
    és PHP-ként amúgy sem adna ki tartalmat).
