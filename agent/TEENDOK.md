@@ -19,10 +19,11 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 
 ## Folyamatban
 
-- **Feltöltős kártyák mozgásai a felhőben (2026-10-17.9):** a `kartyak.py`
-  csak olvasva küldi a `KARTYANAPLO` feltöltős sorait, az egyenlegeket és a
-  napi egyeztetést; az admin helyszín-oldalán látszik. Élesben: célverzió
-  `.9`, utána az előzmény ~1 óra alatt felmegy.
+- **Feltöltős kártyák a felhőben (2026-10-18.1):** a `kartyak.py` csak
+  olvasva küldi a `KARTYANAPLO` feltöltős sorait, az egyenlegeket, a neveket
+  és a napi egyeztetést; az admin helyszín-oldalán látszik. Élesben:
+  `adat_kulcs` a szerveri konfigurációba, célverzió `2026-10-18.1`, utána
+  az előzmény ~1 óra alatt felmegy.
 
 - **Szentkirályi:** átállítva, percenként jelent az adminnak (2026-10-17).
   Most erre az egy helyszínre koncentrálunk.

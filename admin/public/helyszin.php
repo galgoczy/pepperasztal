@@ -43,6 +43,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             pa_audit($user, 'cel_beallitva', $s['kulcs'] . ' -> ' . $v);
             pa_flash('Célverzió: ' . h($v) . '. A gép a következő jelentésnél (kb. 1 perc) frissül.');
         }
+    } elseif ($mit === 'nevmod') {
+        pa_nev_mod_beallit((string)($_POST['mod'] ?? ''), $user, $s['kulcs']);
+        pa_redirect($self . '#kartyak');
     } elseif ($mit === 'atnevez') {
         $nev = trim((string)($_POST['nev'] ?? ''));
         if ($nev !== '') {
@@ -121,8 +124,12 @@ $mst = $db->prepare('SELECT * FROM kartyamozgas WHERE helyszin_id = ? ORDER BY n
 $mst->execute([$id]);
 $mozgasok = $mst->fetchAll();
 ?>
-<h2>Feltöltős kártyák</h2>
-<p class="sub">Kártya-ID a helyszín NovoHostjában; név és kártyakód nem jön fel.
+<h2 id="kartyak">Feltöltős kártyák</h2>
+<?php
+$nmod = pa_nev_mod();
+$van_nev = (bool)array_filter($kartyak, function ($k) { return $k['nev_titkos'] !== null; });
+?>
+<p class="sub">Kártya-ID a helyszín NovoHostjában. A név titkosítva van tárolva, a kártyakód nem jön fel.
 <?php if ($kinfo): ?>
   Napló: <?= (int)($kinfo['kurzor'] ?? 0) ?> / <?= h((string)($kinfo['gen'] ?? '?')) ?> sor-ID
   <?php if (isset($kinfo['gen'], $kinfo['kurzor']) && $kinfo['gen'] > $kinfo['kurzor']): ?>
@@ -141,13 +148,33 @@ $mozgasok = $mst->fetchAll();
 <?php if (!empty($egyd['naplo_nelkul'])): ?> · <?= (int)$egyd['naplo_nelkul'] ?> kártyának nincs naplósora<?php endif; ?></p>
 <?php endif; ?>
 
+<?php if (pa_adat_kulcs() === null): ?>
+<div class="notice">A nevek tárolásához a konfigurációba kell egy titkosító kulcs, pl.:
+<pre class="mono">'adat_kulcs' => '<?= bin2hex(random_bytes(32)) ?>',</pre>
+Ezt a sort (ezzel vagy egy saját, 64 hexa karakteres értékkel) tedd a <code>pepperadmin-config.php</code>-ba.
+A kulcs csak a szerveren legyen; ha elveszik, a gépek a neveket újra felküldik.</div>
+<?php elseif (!empty($kinfo['nevek']) && $kinfo['nevek'] === 'kikapcsolva'): ?>
+<p class="muted">A gépen a nevek küldése ki van kapcsolva (<code>[kartyak] nevek = nem</code>).</p>
+<?php endif; ?>
+
+<?php if ($van_nev): ?>
+<form method="post" class="row" style="margin-bottom:10px"><?= pa_csrf_field() ?><input type="hidden" name="mit" value="nevmod">
+  <span class="muted">Nevek:</span>
+  <button class="btn<?= $nmod === 'rejtett' ? ' primary' : '' ?>" name="mod" value="rejtett">Rejtve</button>
+  <button class="btn<?= $nmod === 'kezdo' ? ' primary' : '' ?>" name="mod" value="kezdo">Kezdőbetű</button>
+  <button class="btn<?= $nmod === 'teljes' ? ' primary' : '' ?>" name="mod" value="teljes">Teljes (15 perc)</button>
+  <?php if ($nmod === 'teljes'): ?><span class="warn">még <?= max(1, (int)ceil(((int)$_SESSION['nev_teljes_ig'] - time()) / 60)) ?> percig, a megtekintés naplózva</span><?php endif; ?>
+</form>
+<?php endif; ?>
+
 <?php if ($kartyak): ?>
 <div class="card scroll"><table>
-<tr><th>Kártya-ID</th><th class="num">Egyenleg (kassza)</th><th class="num">Napló szerint</th><th>Állapot</th>
+<tr><th>Kártya-ID</th><?= $van_nev ? '<th>Név</th>' : '' ?><th class="num">Egyenleg (kassza)</th><th class="num">Napló szerint</th><th>Állapot</th>
 <th>Utolsó mozgás</th><th class="num">Mozgások</th></tr>
 <?php foreach ($kartyak as $k): $all = pa_kartya_allapot($k, $ig); ?>
 <tr<?= (int)$k['ervenyes'] === 0 && $k['ervenyes'] !== null ? ' class="muted"' : '' ?>>
   <td class="mono"><?= (int)$k['kartya_id'] ?></td>
+  <?php if ($van_nev): ?><td><?= h(pa_nev_mutat($k['nev_titkos'], $id, (int)$k['kartya_id'], $nmod)) ?></td><?php endif; ?>
   <td class="num"><?= $k['egyenleg'] !== null ? h(number_format((float)$k['egyenleg'], 0, ',', ' ')) : '–' ?></td>
   <td class="num"><?= $k['naplo_egyenleg'] !== null ? h(number_format((float)$k['naplo_egyenleg'], 0, ',', ' ')) : '–' ?></td>
   <td class="<?= $all === 'ok' ? 'ok' : ($all === 'eltér' ? 'bad' : 'muted') ?>"><?= h($all) ?></td>
@@ -161,11 +188,14 @@ $mozgasok = $mst->fetchAll();
 <?php if ($mozgasok): ?>
 <h2>Legutóbbi kártyamozgások</h2>
 <div class="card scroll"><table>
-<tr><th>Idő</th><th>Kártya-ID</th><th>Mozgás</th><th class="num">Összeg</th><th class="num">Utána</th></tr>
+<?php $nevek_map = [];
+foreach ($kartyak as $k) { $nevek_map[(int)$k['kartya_id']] = $k['nev_titkos']; } ?>
+<tr><th>Idő</th><th>Kártya-ID</th><?= $van_nev ? '<th>Név</th>' : '' ?><th>Mozgás</th><th class="num">Összeg</th><th class="num">Utána</th></tr>
 <?php foreach ($mozgasok as $mz): ?>
 <tr>
   <td><?= h($mz['ido'] ?? '–') ?></td>
   <td class="mono"><?= (int)$mz['kartya_id'] ?></td>
+  <?php if ($van_nev): ?><td><?= h(pa_nev_mutat($nevek_map[(int)$mz['kartya_id']] ?? null, $id, (int)$mz['kartya_id'], $nmod)) ?></td><?php endif; ?>
   <td><?= h(PA_KTIPUS[$mz['tipus']] ?? $mz['tipus']) ?></td>
   <td class="num"><?= h(number_format((float)$mz['osszeg'], 0, ',', ' ')) ?></td>
   <td class="num"><?= h(number_format((float)$mz['elotte'] + (float)$mz['osszeg'], 0, ',', ' ')) ?></td>

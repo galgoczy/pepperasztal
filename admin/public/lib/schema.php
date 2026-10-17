@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-const PA_SCHEMA_VERSION = 3;
+const PA_SCHEMA_VERSION = 4;
 
 function pa_is_sqlite(): bool
 {
@@ -98,6 +98,12 @@ function pa_migrate(): void
         v MEDIUMTEXT NULL,
         ido VARCHAR(19) NOT NULL,
         PRIMARY KEY (helyszin_id, k))$tail");
+    // 4: a kartya neve titkositva (lib/titok.php)
+    try {
+        $db->exec('ALTER TABLE kartya ADD COLUMN nev_titkos TEXT NULL');
+    } catch (Throwable $e) {
+        // mar letezik
+    }
     if ($sqlite) {
         $db->exec('CREATE INDEX IF NOT EXISTS ix_mozgas_kartya ON kartyamozgas (helyszin_id, kartya_id, naplo_id)');
     } else {

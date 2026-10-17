@@ -14,7 +14,11 @@ Mit kuld:
   - egyeztetes: naponta egyszer (02:00 utan) minden feltoltos kartyara
     AKT_KP = utolso naplosor AKT + OSSZEG. Az eltero kartyak listaja.
 
-Amit NEM kuld: nevet, kartyakodot, tulajdonost, szemelyzeti kartyat.
+A feltoltos kartyak neve a pillanatkeppel megy fel (a szerver titkositva
+tarolja, az adminban alapbol csillagozva latszik). Kikapcsolhato:
+[kartyak] nevek = nem - ekkor a szerver a mar tarolt neveket is torli.
+
+Amit NEM kuld: kartyakodot, tulajdonos-adatot, szemelyzeti kartyat.
 
 Kurzor: a gep csak akkor lep tovabb, ha a szerver visszaigazolta, hogy
 megkapta (naplo_ig). Minden lekeresnel az utolso 20 ID-t ujra kuldi: a
@@ -83,12 +87,20 @@ def naplo_sorok(cfg, tol, ig):
              "ido": _ido(r.get("D"))} for r in rows if r.get("ID")]
 
 
-def egyenlegek(cfg):
-    rows = _rows(cfg, "SELECT K.ID AS ID, K.AKT_KP AS E, K.ERVENYES AS V "
-                      "FROM KARTYATORZS K WHERE K.TIPUS = 1;", ["ID", "E", "V"])
-    return [{"id": int(r["ID"]), "egyenleg": _num(r.get("E")),
+def egyenlegek(cfg, nevek=False):
+    rows = _rows(cfg, "SELECT K.ID AS ID, K.AKT_KP AS E, K.ERVENYES AS V, "
+                      "K.NEV AS N FROM KARTYATORZS K WHERE K.TIPUS = 1;",
+                 ["ID", "E", "V", "N"])
+    ki = []
+    for r in rows:
+        if not r.get("ID"):
+            continue
+        d = {"id": int(r["ID"]), "egyenleg": _num(r.get("E")),
              "ervenyes": 1 if (r.get("V") or "").strip() == "1" else 0}
-            for r in rows if r.get("ID")]
+        if nevek:
+            d["nev"] = " ".join((r.get("N") or "").split())[:40]
+        ki.append(d)
+    return ki
 
 
 def egyeztetes(cfg):
@@ -144,8 +156,10 @@ def gyujt(cfg, naplo_gen):
 
     if (st.get("pillanat_gen") != naplo_gen
             or most - st.get("pillanat_ido", 0) > PILLANAT_PERC * 60):
+        nevek = bool(cfg.kartyak["nevek"])
         ki["pillanatkep"] = {"ido": time.strftime("%Y-%m-%d %H:%M:%S"),
-                             "gen": naplo_gen, "lista": egyenlegek(cfg)}
+                             "gen": naplo_gen, "nevek": nevek,
+                             "lista": egyenlegek(cfg, nevek)}
 
     nap = time.strftime("%Y-%m-%d")
     if (st.get("egyeztetes_nap") != nap

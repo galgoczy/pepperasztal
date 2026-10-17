@@ -33,6 +33,11 @@ return [
         'client_secret' => '',
     ],
 
+    // A feltoltos kartyak nevenek titkositasa az adatbazisban (AES-256-GCM).
+    // 64 hexa karakter, pl.: php -r "echo bin2hex(random_bytes(32));"
+    // Enelkul a nevek nem tarolodnak. Ha elveszik, a gepek ujra felkuldik.
+    'adat_kulcs' => '',
+
     // Csak az elso passkey felvetelehez, ha Google-belepes nincs: legalabb
     // 20 veletlen karakter. A /elso-passkey.php oldalon a felhasznalonevvel
     // egyutt kell megadni. Ha mar van passkey-d, TOROLD ezt a sort.

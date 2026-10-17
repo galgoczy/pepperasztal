@@ -198,7 +198,10 @@ A `jelentes.py` percenként elküldi a mentés állapotát, egy adatbázis-prób
 - naponta egyszer (02:00 után) egyeztetés: kassza szerinti egyenleg =
   utolsó naplósor szerinti egyenleg.
 
-Név, kártyakód, tulajdonos, nyugta és személyzeti kártya nem megy fel. A
+A feltöltős kártyák neve is felmegy (a szerver titkosítva tárolja, az
+adminban alapból csillagozva látszik); kikapcsolás: `[kartyak]` →
+`nevek = nem`. Kártyakód, tulajdonos-adat, nyugta és személyzeti kártya nem
+megy fel. A
 gép csak akkor lép tovább a naplóban, ha a szerver visszaigazolta az
 adatot, ezért szakadás után sem marad ki és nem duplázódik semmi.
 Kikapcsolás: az ini-ben `[kartyak]` → `kuldes = nem`.

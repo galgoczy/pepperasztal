@@ -9,11 +9,11 @@ Mit kuld (HTTPS, helyszin-tokennel):
     generatoranak erteke (GEN_ID(..., 0) - tablat nem olvas, nem ir)
   - az utolso frissitesi kiserlet eredmenye
 
-Feltoltos kartyak (kartyak.py): a mozgasok (kartya-ID, osszeg, idopont)
-es az egyenlegek - nev es kartyakod nelkul. Kikapcsolhato:
-[kartyak] kuldes = nem.
+Feltoltos kartyak (kartyak.py): a mozgasok (kartya-ID, osszeg, idopont),
+az egyenlegek es a kartyak neve (a szerveren titkositva). Kikapcsolhato:
+[kartyak] kuldes = nem, illetve csak a nevek: nevek = nem.
 
-Amit NEM kuld: nevet, kartyakodot, nyugtat, szemelyzeti kartyat.
+Amit NEM kuld: kartyakodot, nyugtat, szemelyzeti kartyat.
 
 Ha a valasz szerint ki van jelolve egy ujabb, alairt kiadas, atadja a
 frissito.py-nak (ami az alairast es a verziot ellenorzi). Parancsot a

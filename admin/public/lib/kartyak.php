@@ -3,7 +3,9 @@
  * Feltoltos kartyak: a gepek jelentesenek "kartyak" resze (agent/kartyak.py).
  *
  *   naplo:       { tol, ig, sorok: [{id, kartya, tipus, osszeg, elotte, ido}] }
- *   pillanatkep: { ido, gen, lista: [{id, egyenleg, ervenyes}] }
+ *   pillanatkep: { ido, gen, nevek, lista: [{id, egyenleg, ervenyes, nev?}] }
+ *                (a nev titkositva kerul az adatbazisba; nevek = false eseten
+ *                a helyszin minden tarolt nevet toroljuk)
  *   egyeztetes:  { ido, kartyak, naplo_nelkul, elteres: [...] }
  *
  * A mozgasok (helyszin, naplo-ID) szerint egyediek: az ujrakuldott sorok
@@ -12,6 +14,8 @@
  */
 
 declare(strict_types=1);
+
+require_once __DIR__ . '/titok.php';
 
 const PA_KTIPUS = ['FK' => 'Költés', 'KF' => 'Feltöltés', 'HF' => 'Hitel fel', 'FH' => 'Hitel vissza'];
 
@@ -99,12 +103,18 @@ function pa_kartyak_fogad(int $hid, array $k): array
         }
         $ido = pa_ido_ok($p['ido'] ?? '') ?? pa_now();
         $gen = isset($p['gen']) ? (int)$p['gen'] : null;
+        $nevek = ($p['nevek'] ?? false) === true;
+        $kulcs = pa_adat_kulcs() !== null;
         $db->beginTransaction();
         try {
+            if (!$nevek) {
+                $db->prepare('UPDATE kartya SET nev_titkos = NULL WHERE helyszin_id = ?')->execute([$hid]);
+            }
             $up = $db->prepare('UPDATE kartya SET egyenleg = ?, egyenleg_ido = ?, egyenleg_gen = ?, ervenyes = ?
                                 WHERE helyszin_id = ? AND kartya_id = ?');
             $ins = $db->prepare('INSERT INTO kartya (egyenleg, egyenleg_ido, egyenleg_gen, ervenyes, helyszin_id, kartya_id)
                                  VALUES (?, ?, ?, ?, ?, ?)');
+            $nevup = $db->prepare('UPDATE kartya SET nev_titkos = ? WHERE helyszin_id = ? AND kartya_id = ?');
             foreach ($lista as $r) {
                 $kid = (int)($r['id'] ?? 0);
                 if ($kid <= 0) {
@@ -115,6 +125,10 @@ function pa_kartyak_fogad(int $hid, array $k): array
                 if ($up->rowCount() === 0) {
                     $ins->execute($row);
                 }
+                if ($nevek && $kulcs && isset($r['nev']) && is_string($r['nev'])) {
+                    $nev = mb_substr(trim($r['nev']), 0, 40);
+                    $nevup->execute([$nev === '' ? null : pa_titkosit($nev, pa_nev_cel($hid, $kid)), $hid, $kid]);
+                }
             }
             $db->commit();
         } catch (Throwable $e) {
@@ -122,6 +136,7 @@ function pa_kartyak_fogad(int $hid, array $k): array
             throw $e;
         }
         $info['pillanatkep'] = $ido;
+        $info['nevek'] = $nevek ? ($kulcs ? 'titkositva' : 'nincs adat_kulcs') : 'kikapcsolva';
         $info['kartyak'] = count($lista);
         $ki['pillanatkep_ok'] = true;
     }
@@ -181,4 +196,61 @@ function pa_kartya_allapot(array $k, int $beerkezett_ig): string
         return 'szinkron…';
     }
     return abs((float)$k['egyenleg'] - (float)$k['naplo_egyenleg']) < 0.005 ? 'ok' : 'eltér';
+}
+
+/** A titkositas "cimkeje": a nev csak ehhez a helyszinhez es kartyahoz tartozik. */
+function pa_nev_cel(int $hid, int $kid): string
+{
+    return 'kartya-nev:' . $hid . ':' . $kid;
+}
+
+// ---- nevek megjelenitese az adminban -------------------------------------
+
+const PA_NEV_TELJES_MP = 900;   // a teljes nev 15 percig latszik
+
+/** 'rejtett' (csak csillag) | 'kezdo' (kezdobetu + csillag) | 'teljes' */
+function pa_nev_mod(): string
+{
+    pa_session();
+    $m = $_SESSION['nev_mod'] ?? 'rejtett';
+    if ($m === 'teljes' && (int)($_SESSION['nev_teljes_ig'] ?? 0) < time()) {
+        $m = $_SESSION['nev_mod'] = 'rejtett';
+    }
+    return in_array($m, ['rejtett', 'kezdo', 'teljes'], true) ? $m : 'rejtett';
+}
+
+function pa_nev_mod_beallit(string $m, string $user, string $hely): void
+{
+    pa_session();
+    if (!in_array($m, ['rejtett', 'kezdo', 'teljes'], true)) {
+        return;
+    }
+    $_SESSION['nev_mod'] = $m;
+    if ($m === 'teljes') {
+        $_SESSION['nev_teljes_ig'] = time() + PA_NEV_TELJES_MP;
+        pa_audit($user, 'nevek_mutatva', $hely . ' (15 perc)');
+    } else {
+        unset($_SESSION['nev_teljes_ig']);
+    }
+}
+
+function pa_nev_mutat(?string $titkos, int $hid, int $kid, string $mod): string
+{
+    if ($titkos === null) {
+        return '';
+    }
+    if ($mod === 'rejtett') {
+        return '*****';
+    }
+    $nev = pa_visszafejt($titkos, pa_nev_cel($hid, $kid));
+    if ($nev === null) {
+        return '(nem olvasható)';
+    }
+    if ($mod === 'teljes') {
+        return $nev;
+    }
+    $szavak = preg_split('/\s+/u', trim($nev)) ?: [];
+    return implode(' ', array_map(function ($w) {
+        return mb_substr($w, 0, 1) . '***';
+    }, $szavak));
 }
