@@ -16,6 +16,8 @@ A VIP-app tervezese elott ezekre a kerdesekre kell valasz:
   8. Mely triggerek/eljarasok futnak le irasnal (-> milyen jog kell)?
   9. Kornyezet: InterBase verzio, ODS, dialektus, DB-meret, a 3050-es
      port kifele nyitva van-e, van-e nyoma mentesnek.
+  10. Van-e azonos nevu kartya (pl. szemelyzeti + feltoltos)?
+  11. Mit ellenoriznek a kartya-triggerek es az NH$CHK_DBL_VIP_CARD?
 
 BIZTONSAG
   * A script minden utasitast ellenoriz: csak SELECT / SET LIST / SHOW
@@ -64,6 +66,8 @@ _ALLOWED = (
     re.compile(r"^SELECT\b", re.I),
     re.compile(r"^SET\s+LIST\s+ON$", re.I),
     re.compile(r"^SHOW\s+SQL\s+DIALECT$", re.I),
+    # Egy trigger / tarolt eljaras forrasanak kiirasa (csak olvas).
+    re.compile(r"^SHOW\s+(PROCEDURE|TRIGGER)\s+[A-Z0-9_$]+$", re.I),
 )
 
 
@@ -1048,6 +1052,84 @@ def sec_iras(db, rep):
             rep.err(e)
 
 
+def sec_nevek(db, rep, kartyak):
+    """Azonos nevu kartyak (pl. egy szemelyzeti es egy feltoltos). Nevet nem
+    ir ki, csak kartya-ID-t es tipust."""
+    rep.h("9. AZONOS NEVU KARTYAK")
+    if kartyak is None:
+        rows, e = db.rows("SELECT K.ID AS ID, K.TIPUS AS TIPUS, K.KARTYA AS "
+                          "KOD, K.NEV AS NEV FROM KARTYATORZS K;",
+                          ["ID", "TIPUS", "KOD", "NEV"])
+        rep.err(e)
+        kartyak = dict((_i(r.get("ID")), r) for r in rows)
+    csop, kodok = {}, {}
+    for kid, k in kartyak.items():
+        nev = " ".join(_s(k.get("NEV")).split()).upper()
+        if nev:
+            csop.setdefault(nev, []).append((kid, _i(k.get("TIPUS"))))
+        kod = _s(k.get("KOD")).strip()
+        if kod:
+            kodok[kod] = kodok.get(kod, 0) + 1
+    tobb = [sorted(v) for v in csop.values() if len(v) > 1]
+    rep.kv("Kartyak / kulonbozo nevek", "{0} / {1}".format(len(kartyak), len(csop)))
+    rep.kv("Nevek, amelyek tobb kartyan szerepelnek", len(tobb))
+    kombo = {}
+    for g in tobb:
+        k = "+".join(str(t) for _, t in sorted(g, key=lambda x: (x[1], x[0])))
+        kombo[k] = kombo.get(k, 0) + 1
+    for k in sorted(kombo):
+        rep.kv("  tipusok: " + k, kombo[k])
+    vegyes = [g for g in tobb if 1 in [t for _, t in g] and
+              len(set(t for _, t in g)) > 1]
+    if vegyes:
+        rep.sub("Peldak: feltoltos (1) + mas tipus azonos neven (kartya-ID, tipus)")
+        for g in vegyes[:10]:
+            rep.text(", ".join("ID {0} (tipus {1})".format(i, t) for i, t in g))
+    rep.kv("Kartyakod, ami tobb kartyan is szerepel",
+           sum(1 for n in kodok.values() if n > 1))
+    rep.verdict("Az ugynok kartya-ID alapjan dolgozik, a nev nem azonosit. "
+                "Az azonos nev csak a kijelzesnel szamit.")
+
+
+def sec_forras(db, rep):
+    """A kartya-modositaskor futo triggerek es eljarasok forrasa - igy
+    latszik, mit ellenoriz pl. az NH$CHK_DBL_VIP_CARD."""
+    rep.h("10. KARTYA-TRIGGEREK ES ELJARASOK FORRASA")
+    rows, e = db.rows(
+        "SELECT RDB$TRIGGER_NAME AS NEV FROM RDB$TRIGGERS WHERE "
+        "RDB$RELATION_NAME IN ('KARTYATORZS', 'KARTYANAPLO');", ["NEV"])
+    rep.err(e)
+    triggerek = [n for n in ((r.get("NEV") or "").strip() for r in rows)
+                 if IDENT.match(n)]
+    eljarasok = ["NH$CHK_DBL_VIP_CARD"]
+    if triggerek:
+        rows, e = db.rows(
+            "SELECT DISTINCT RDB$DEPENDED_ON_NAME AS MIT, RDB$DEPENDED_ON_TYPE "
+            "AS MT FROM RDB$DEPENDENCIES WHERE RDB$DEPENDED_ON_TYPE = 5 AND "
+            "RDB$DEPENDENT_NAME IN ({0});"
+            .format(", ".join("'{0}'".format(t) for t in triggerek)),
+            ["MIT", "MT"])
+        rep.err(e)
+        for r in rows:
+            n = (r.get("MIT") or "").strip()
+            if r.get("MT") == "5" and IDENT.match(n) and n not in eljarasok:
+                eljarasok.append(n)
+    for fajta, nevek in (("TRIGGER", sorted(triggerek)),
+                         ("PROCEDURE", eljarasok)):
+        for n in nevek:
+            rep.sub("{0} {1}".format(fajta, n))
+            out, err = db.raw("SHOW {0} {1};".format(fajta, n))
+            sorok = [l.rstrip() for l in out.splitlines()
+                     if l.strip() and not l.startswith("SQL>")]
+            if not sorok:
+                rep.text("(nincs kimenet)")
+            for l in sorok[:200]:
+                rep.text(l)
+            if len(sorok) > 200:
+                rep.text("... ({0} sor, levagva)".format(len(sorok)))
+            rep.err(err)
+
+
 # ===========================================================================
 
 def main():
@@ -1111,6 +1193,10 @@ def main():
         sec_naplo_invarians(d, rep)
     db.progress("-- 8. iras")
     sec_iras(db, rep)
+    db.progress("-- 9. azonos nevek")
+    sec_nevek(db, rep, d["kartyak"] if mx is not None else None)
+    db.progress("-- 10. forrasok")
+    sec_forras(db, rep)
     db.progress("-- kesz")
 
     if db.errors:
