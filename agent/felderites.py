@@ -18,9 +18,13 @@ A VIP-app tervezese elott ezekre a kerdesekre kell valasz:
      port kifele nyitva van-e, van-e nyoma mentesnek.
 
 BIZTONSAG
-  * A tranzakcio adatbazis-szinten READ ONLY (SET TRANSACTION READ ONLY),
-    es a script minden utasitast ellenoriz: csak SELECT / SET / SHOW
-    mehet ki. Nincs COMMIT, a QUIT visszagorget.
+  * A script minden utasitast ellenoriz: csak SELECT / SET LIST / SHOW
+    mehet ki. Nincs COMMIT, a QUIT visszagorget. PEPPER_OLVAS-kent
+    (alapertelmezes, ha van jelszava) maga az adatbazis is tiltja az irast.
+  * SET TRANSACTION-t szandekosan NEM hasznalunk: az IB6 isql ilyenkor
+    rakerdez ("Commit current transaction (y/n)?"), es a kovetkezo
+    bemeneti sort veszi valasznak. Elesben ez a SET LIST ON-t nyelte el
+    ("Rolling back work."), es minden lekerdezes parszolhatatlan lett.
   * Nyitvatartason kivul futtasd: nehany lekerdezes sok nyugtat olvas
     vegig. Csak indexelt tartomanyon (NYUGTAFIZETES.FEJ, NYUGTATETEL.FEJ)
     szurunk, de a POS gepet akkor se terheljuk feleslegesen.
@@ -58,7 +62,6 @@ IDENT = re.compile(r"^[A-Z0-9_$]+$")
 _ALLOWED = (
     re.compile(r"^SELECT\b", re.I),
     re.compile(r"^SET\s+LIST\s+ON$", re.I),
-    re.compile(r"^SET\s+TRANSACTION\s+READ\s+ONLY$", re.I),
     re.compile(r"^SHOW\s+SQL\s+DIALECT$", re.I),
 )
 
@@ -89,17 +92,19 @@ def assert_readonly(sql):
 
 
 class DB(object):
-    """Lekerdezesek egy-egy kulon isql futasban, READ ONLY tranzakcioban."""
+    """Lekerdezesek egy-egy kulon isql futasban, COMMIT nelkul."""
 
     def __init__(self, cfg, user_key):
         self.cfg = cfg
         self.user_key = user_key
         self.errors = []
+        self.last_out = ""
 
     def raw(self, sql):
-        full = "SET TRANSACTION READ ONLY;\nSET LIST ON;\n" + sql
+        full = "SET LIST ON;\n" + sql
         assert_readonly(full)
         out, err = run_isql(self.cfg, full, user_key=self.user_key)
+        self.last_out = out
         if err:
             self.errors.append((sql.strip()[:120], err))
         return out, err
@@ -790,11 +795,13 @@ def main():
     tools_ok = bool(cfg.users["sysdba"][1])
 
     db = DB(cfg, user)
-    # Elso lepes: mukodik-e a READ ONLY tranzakcio. Ha nem, nem megyunk
-    # tovabb - ne fusson semmi olyan kornyezetben, ahol ezt nem latjuk.
+    # Elso lepes: egy proba-lekerdezes. Ha ez sem parszolhato, nem megyunk
+    # tovabb - es megmutatjuk, mit adott vissza az isql.
     probe, err = db.one("SELECT 1 AS X FROM RDB$DATABASE;", "X")
     if probe != "1":
-        sys.exit("HIBA: a proba-lekerdezes nem futott le.\n" + (err or ""))
+        sys.exit("HIBA: a proba-lekerdezes nem futott le.\n"
+                 "stderr: {0}\nkimenet eleje:\n{1}".format(
+                     (err or "").strip()[:300], db.last_out.strip()[:500]))
 
     rep = Report()
     rep.lines += ["PEPPER HOUSE - NOVOHOST FELDERITES (csak olvaso)",

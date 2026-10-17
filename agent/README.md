@@ -9,7 +9,7 @@ Ez a 0. fázis: **mentés, korlátozott adatbázis-felhasználók és felderít�
 | `backup.py` | napi `gbak` mentés manifesttel, rotáció; `--proba`: ellenőrzés egy **másik** gépen | nem |
 | `install_backup.bat` | a napi mentés ütemezett feladatként, SYSTEM fiókkal | nem |
 | `setup_users.py` | `PEPPER_OLVAS` és `PEPPER_VIP` felhasználó és a jogaik | csak jogosultságot (GRANT) |
-| `felderites.py` | csak olvasó felmérés a VIP-app tervezéséhez | nem (READ ONLY tranzakció) |
+| `felderites.py` | csak olvasó felmérés a VIP-app tervezéséhez | nem |
 | `common.py` | közös isql/ini/DPAPI réteg | – |
 
 Python 3.4-től működik (XP-s gépek is), csak a standard könyvtárat használja.
@@ -129,8 +129,9 @@ python felderites.py
 ```
 
 Nyitvatartáson kívül futtasd. Alapból `PEPPER_OLVAS`-ként fut; ha az még
-nincs, `--user sysdba`. A tranzakció adatbázis-szinten `READ ONLY`, és a
-script maga is elutasít minden nem-`SELECT` utasítást.
+nincs, `--user sysdba`. A script minden utasítást ellenőriz, csak `SELECT`
+mehet ki, és nincs `COMMIT`. `PEPPER_OLVAS`-ként maga az adatbázis is tiltja
+az írást, ezért a felhasználók létrehozása után így futtasd.
 
 A kimenet egy `felderites_<helyszín>_<dátum>.txt`. **Nincs benne név,
 kártyakód vagy más személyes adat**, nyugodtan továbbítható. A válaszok,

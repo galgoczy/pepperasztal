@@ -196,13 +196,18 @@ def rotate(cfg, new_file):
 # ===========================================================================
 
 def read_counts(cfg):
-    """A manifest szamai. READ ONLY tranzakcio, csak olvas."""
-    out, err = run_isql(cfg, "SET TRANSACTION READ ONLY;\n" + MANIFEST_SQL,
-                        user_key="sysdba")
+    """A manifest szamai. Egyetlen fix SELECT, COMMIT nelkul.
+
+    NEM hasznalunk SET TRANSACTION-t: az IB6 isql ilyenkor rakerdez
+    ("Commit current transaction (y/n)?"), es a kovetkezo bemeneti sort
+    veszi valasznak - igy a SET LIST ON elveszett, es a kimenet
+    parszolhatatlan lett ("Rolling back work.")."""
+    out, err = run_isql(cfg, MANIFEST_SQL, user_key="sysdba")
     rows = parse_list(out, MANIFEST_COLS)
     if not rows or not rows[0].get("NYUGTA"):
-        raise RuntimeError("A darabszamok nem olvashatok: " +
-                           (err or out).strip()[:300])
+        raise RuntimeError("A darabszamok nem olvashatok. stderr: {0!r} | "
+                           "kimenet eleje: {1!r}".format(
+                               err.strip()[:200], out.strip()[:300]))
     return dict((k, int(float(rows[0][k] or 0))) for k in MANIFEST_COLS)
 
 
@@ -341,8 +346,9 @@ def cmd_proba(cfg, src, sajat_gepen):
         out, err = run_isql(pcfg, MANIFEST_SQL, user_key="sysdba")
         rows = parse_list(out, MANIFEST_COLS)
         if not rows or not rows[0].get("NYUGTA"):
-            raise RuntimeError("A visszaallitott DB nem olvashato: " +
-                               (err or out).strip()[:300])
+            raise RuntimeError("A visszaallitott DB nem olvashato. stderr: "
+                               "{0!r} | kimenet eleje: {1!r}".format(
+                                   err.strip()[:200], out.strip()[:300]))
         got = dict((k, int(float(rows[0][k] or 0))) for k in MANIFEST_COLS)
         log("   visszaallitott: kartya {KARTYA}, naplo ID {NAPLO}, "
             "nyugta ID {NYUGTA}".format(**got))
