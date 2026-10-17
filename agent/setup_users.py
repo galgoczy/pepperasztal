@@ -268,26 +268,51 @@ def gsec(cfg, args):
     return rc, out, err
 
 
+def gsec_users(out):
+    """A gsec -display kimenetebol a felhasznalonevek (a fejlec es az
+    elvalaszto sor utani sorok elso szava)."""
+    names, after_header = [], False
+    for line in out.splitlines():
+        s = line.strip()
+        if s.lower().startswith("user name"):
+            after_header = True
+            continue
+        if not after_header or not s or set(s) <= set("-= "):
+            continue
+        w = s.split()[0]
+        if re.match(r"^[A-Za-z0-9_$]+$", w):
+            names.append(w.upper())
+    return names
+
+
 def gsec_preflight(cfg):
-    """Eleri-e a gsec a felhasznalolistat? Ha nem, semmit nem probalunk."""
+    """
+    Eleri-e a gsec a felhasznalolistat? Ha nem, semmit nem probalunk.
+
+    Az elerhetoseg jele: van fejlec ("user name ...") es nincs hiba. A
+    SYSDBA-t NEM varjuk el a listaban - az IB 7.5 elesben nem mutatta.
+    """
     sec = cfg.security_db_path()
     log("   biztonsagi adatbazis: {0}".format(
         sec or "NEM TALALOM (a gsec a sajat alapertelmezeset hasznalja)"))
     rc, out, err = gsec(cfg, ["-display"])
-    if not re.search(r"^\s*SYSDBA\b", out, re.M | re.I):
-        msg = (err or out).strip().splitlines()
-        sys.exit("HIBA: a gsec nem eri el a felhasznalolistat: {0}\n"
-                 "Ellenorizd, hol van az admin.ib (IB 7.x) vagy isc4.gdb (IB6), "
-                 "es add meg a pepper_agent.ini-ben:\n"
-                 "  [interbase]\n  security_db = C:\\...\\admin.ib\n"
-                 "Semmi nem valtozott.".format(msg[0] if msg else "?"))
-    log("   gsec: a felhasznalolista elerheto")
+    if "user name" in out.lower() and not err.strip():
+        users = gsec_users(out)
+        log("   gsec: a felhasznalolista elerheto ({0} felhasznalo, SYSDBA a "
+            "listaban: {1})".format(len(users), "igen" if "SYSDBA" in users
+                                    else "nem"))
+        return
+    msg = (err or out).strip().splitlines()
+    sys.exit("HIBA: a gsec nem eri el a felhasznalolistat: {0}\n"
+             "Ellenorizd, hol van az admin.ib (IB 7.x) vagy isc4.gdb (IB6), "
+             "es add meg a pepper_agent.ini-ben:\n"
+             "  [interbase]\n  security_db = C:\\...\\admin.ib\n"
+             "Semmi nem valtozott.".format(msg[0] if msg else "?"))
 
 
 def gsec_user_exists(cfg, name):
     rc, out, err = gsec(cfg, ["-display", name])
-    return bool(re.search(r"^\s*" + re.escape(name) + r"\b", out,
-                          re.M | re.I))
+    return name.upper() in gsec_users(out)
 
 
 def cmd_letrehoz(cfg, args):
