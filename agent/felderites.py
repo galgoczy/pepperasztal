@@ -544,6 +544,15 @@ def sec_minta(d, rep):
             tip, st["n"], st["ido"], st["forint"], st["vegertek"],
             st["nulla"]))
     rep.text("(1 = Feltolto, 4 = Szemelyzet)")
+    t1 = stat.get("1")
+    if t1 and t1["n"] and t1["forint"] >= 0.95 * t1["n"]:
+        rep.verdict("Feltolto kartyanal minden VIP-fizeteshez van FK naplosor "
+                    "pontosan ugyanazzal az osszeggel -> a koltes-ertesites a "
+                    "KARTYANAPLO figyelesere epulhet.")
+    t4 = stat.get("4")
+    if t4 and t4["n"] and not t4["ido"]:
+        rep.text("A szemelyzeti kartya (4) nem ir naplosort - a fogyasztasa "
+                 "az AKT_FORG-ban halmozodik.")
 
     rep.sub("Minta: legutobbi VIP-nyugtak tipusonkent (csak osszegek)")
     by_fej = {}
@@ -614,12 +623,18 @@ def sec_reszfizetes(d, rep, db):
 
     vip_fej = [f for f, rs in by_fej.items()
                if any(fiz(r) and _i(r.get("FID")) == 10 for r in rs)]
-    vegyes, nullas, bontas, nemfiz = 0, 0, {}, {}
+    fej_tipus = {}
+    for v in d["vip"]:
+        k = d["kartyak"].get(_i(v.get("KID")), {})
+        fej_tipus[_i(v.get("FEJ"))] = _s(k.get("TIPUS")) or "?"
+    vegyes, nullas, bontas, nemfiz, vegyes_tip = 0, 0, {}, {}, {}
     for f in vip_fej:
         mas = [r for r in by_fej[f] if fiz(r) and _i(r.get("FID")) != 10]
         valodi = [r for r in mas if abs(_f(r.get("FORINT")) or 0) >= 0.5]
         if valodi:
             vegyes += 1
+            t = fej_tipus.get(f, "?")
+            vegyes_tip[t] = vegyes_tip.get(t, 0) + 1
         if mas and not valodi:
             nullas += 1
         for r in valodi:
@@ -635,6 +650,9 @@ def sec_reszfizetes(d, rep, db):
     rep.kv("  ebbol mas, NEM NULLA fizetes is van rajta",
            "{0}  ({1})".format(fmt(vegyes), pct(vegyes, vf)))
     rep.kv("  ebbol csak 0 Ft-os mas fizetesi sor van", fmt(nullas))
+    if vegyes_tip:
+        rep.kv("  vegyes fizetes kartyatipusonkent", ", ".join(
+            "tipus {0}: {1}".format(t, n) for t, n in sorted(vegyes_tip.items())))
     if bontas:
         rep.sub("A VIP melletti valodi fizetesek bontasa")
         rep.text("FIZTIPID  ELOJEL      DB     OSSZEG   (0 keszp., 3 bankkartya,"
@@ -711,7 +729,7 @@ def sec_ean(db, rep):
     rep.text("")
     rep.text("{0:<34} {1:>8} {2:>8} {3:>8}".format(
         "tabla.mezo", "kitolt.", "'2..'", "';2..'"))
-    used2, used3, hossz = {}, set(), {}
+    used2, used3, hossz, used2_13 = {}, set(), {}, {}
     for t, m in targets:
         if not (IDENT.match(t) and IDENT.match(m)):
             continue
@@ -737,22 +755,28 @@ def sec_ean(db, rep):
                 used2[c[:2]] = used2.get(c[:2], 0) + 1
                 used3.add(c[:3])
                 hossz[len(c)] = hossz.get(len(c), 0) + 1
-    rep.sub("Termekkodok '2' kezdettel - 2 jegyu prefixek")
-    rep.text("  ".join("{0}:{1}".format(p, used2.get(p, 0))
-                       for p in ["2" + str(i) for i in range(10)]))
+                if len(c) == 13 and c.isdigit():
+                    used2_13[c[:2]] = used2_13.get(c[:2], 0) + 1
+    rep.sub("Termekkodok '2' kezdettel")
     if hossz:
         rep.text("Kodhosszak: " + ", ".join("{0} jegy: {1}".format(k, n)
                                             for k, n in sorted(hossz.items())))
-    szabad2 = [p for p in ["2" + str(i) for i in range(10)] if p not in used2]
-    szabad3 = [p for p in ["2{0:02d}".format(i) for i in range(100)]
-               if p not in used3]
-    rep.kv("Szabad 2 jegyu prefix", ", ".join(szabad2) or "nincs")
-    rep.kv("Szabad 3 jegyu prefix (elso 12)", ", ".join(szabad3[:12]) or
-           "nincs")
-    rep.verdict("A '2'-es tartomanyt a bolt sajat (merleg/belso) kodjai mar "
-                "hasznaljak. Vagy egy fenti szabad prefix kell, vagy a "
-                "kartya maradjon a mai ';'+11 jegy+'?' formatumban, Code128 "
-                "vonalkodkent - lasd a megbeszelest.")
+    ean13 = used2_13
+    rep.kv("13 jegyu (EAN-13) kod '2' kezdettel", sum(ean13.values()))
+    if ean13:
+        rep.text("  2 jegyu prefixek: " + "  ".join(
+            "{0}:{1}".format(p, ean13.get(p, 0))
+            for p in ["2" + str(i) for i in range(10)]))
+        szabad = [p for p in ["2" + str(i) for i in range(10)]
+                  if p not in ean13]
+        rep.kv("  szabad 2 jegyu EAN-prefix", ", ".join(szabad) or "nincs")
+        rep.verdict("Van 13 jegyu '2'-es kod - a kartyakod csak szabad "
+                    "prefixszel keszulhet.")
+    else:
+        rep.verdict("Nincs 13 jegyu '2'-es kod: a rovid (3-4 jegyu) gyorskodok "
+                    "pontos egyezesnel nem utkozhetnek egy 13 jegyu "
+                    "kartyakoddal. A prefix tehat szabadon valaszthato - a "
+                    "kerdes az, hogyan kezeli a kassza a beolvasott kodot.")
     rep.text("")
     rep.text("Nyitott (csak elo teszttel): megtalalja-e a kassza a beolvasott "
              "kodot pontos egyezessel a KARTYA mezoben.")
@@ -802,13 +826,15 @@ def sec_etlap(db, rep):
         rep.text("  " + "  ".join("{0}:{1}".format(r.get("TIPUS"), r.get("DB"))
                                   for r in rows))
     rep.sub("ETELTIP (tetelkategoriak - a pontszabalyokhoz)")
-    out, e = db.raw("SELECT * FROM ETELTIP;")
+    tipdb = dict((_i(r.get("TIPUS")), _i(r.get("DB"))) for r in rows)
+    tips, e = db.rows("SELECT T.ID AS ID, T.NEV AS NEV FROM ETELTIP T "
+                      "ORDER BY T.ID;", ["ID", "NEV"])
     rep.err(e)
-    body = [mask_digits(l.rstrip()) for l in out.splitlines()
-            if l.strip() and not l.strip().startswith(
-                ("SQL>", "CON>", "Database:"))]
-    for l in body[:400]:
-        rep.text(l)
+    rep.text("  ID  kategoria                  aktiv tetel")
+    for t in tips:
+        rep.text("{0:>4}  {1:<26} {2:>6}".format(
+            t.get("ID"), _s(t.get("NEV"))[:26],
+            tipdb.get(_i(t.get("ID")), 0)))
 
     rep.verdict("Ha fent nincs datumozott menu-tabla, a napi etlap NEM a "
                 "NovoHostban el. A korabban kapott Knorr menu-dump "
@@ -841,8 +867,9 @@ def sec_kartyak(db, rep):
     if not rows and not nul:
         rep.verdict("Minden kartyan igaz - a napi egyeztetes erre epulhet.")
     else:
-        rep.verdict("Nem minden kartyan igaz. Mielott a napi egyeztetes erre "
-                    "riaszt, ki kell deriteni, mibol jon az elteres.")
+        rep.verdict("Nem minden kartyan igaz. A szemelyzeti kartyaknal (4) ez "
+                    "vart: a fogyasztasuk az AKT_FORG-ban halmozodik. A napi "
+                    "egyeztetes az 5b szakasz szerinti szabalyra epuljon.")
 
     rep.h("6. LIMIT / LIMITALVA / KARTYATIPUS / KARTYAGYUJTO")
     rows, e = db.rows(
