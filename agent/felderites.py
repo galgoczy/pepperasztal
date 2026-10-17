@@ -1079,14 +1079,31 @@ def sec_nevek(db, rep, kartyak):
         kombo[k] = kombo.get(k, 0) + 1
     for k in sorted(kombo):
         rep.kv("  tipusok: " + k, kombo[k])
-    vegyes = [g for g in tobb if 1 in [t for _, t in g] and
-              len(set(t for _, t in g)) > 1]
-    if vegyes:
-        rep.sub("Peldak: feltoltos (1) + mas tipus azonos neven (kartya-ID, tipus)")
-        for g in vegyes[:10]:
+    if tobb:
+        rep.sub("Azonos nevu kartyak (kis-/nagybetu es szokoz nelkul; kartya-ID, tipus)")
+        for g in tobb[:20]:
             rep.text(", ".join("ID {0} (tipus {1})".format(i, t) for i, t in g))
     rep.kv("Kartyakod, ami tobb kartyan is szerepel",
            sum(1 for n in kodok.values() if n > 1))
+
+    rep.sub("Mezohosszak (KARTYATORZS)")
+    rows, e = db.rows(
+        "SELECT RF.RDB$FIELD_NAME AS MEZO, F.RDB$CHARACTER_LENGTH AS HOSSZ, "
+        "F.RDB$FIELD_LENGTH AS BAJT, F.RDB$FIELD_TYPE AS FT FROM "
+        "RDB$RELATION_FIELDS RF JOIN RDB$FIELDS F ON F.RDB$FIELD_NAME = "
+        "RF.RDB$FIELD_SOURCE WHERE RF.RDB$RELATION_NAME = 'KARTYATORZS' "
+        "AND RF.RDB$FIELD_NAME IN ('NEV', 'KARTYA');",
+        ["MEZO", "HOSSZ", "BAJT", "FT"])
+    rep.err(e)
+    ft = {"14": "CHAR", "37": "VARCHAR"}
+    for r in rows:
+        h = r.get("HOSSZ")
+        rep.kv("  " + (r.get("MEZO") or "").strip(), "{0}({1})".format(
+            ft.get(r.get("FT"), "tipus " + str(r.get("FT"))),
+            h if h not in (None, "<null>") else r.get("BAJT")))
+    hosszak = [len(" ".join(_s(k.get("NEV")).split())) for k in kartyak.values()]
+    if hosszak:
+        rep.kv("  Leghosszabb meglevo nev (karakter)", max(hosszak))
     rep.verdict("Az ugynok kartya-ID alapjan dolgozik, a nev nem azonosit. "
                 "Az azonos nev csak a kijelzesnel szamit.")
 
@@ -1100,7 +1117,9 @@ def sec_forras(db, rep):
         "RDB$RELATION_NAME IN ('KARTYATORZS', 'KARTYANAPLO');", ["NEV"])
     rep.err(e)
     triggerek = [n for n in ((r.get("NEV") or "").strip() for r in rows)
-                 if IDENT.match(n)]
+                 if IDENT.match(n) and not n.startswith("CHECK_")]
+    rep.text("(A CHECK_* triggerek a CHECK-feltetelek rendszertriggerei, "
+             "forrasuk nem kerheto le.)")
     eljarasok = ["NH$CHK_DBL_VIP_CARD"]
     if triggerek:
         rows, e = db.rows(
