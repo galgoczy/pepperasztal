@@ -20,6 +20,14 @@ MENTES (a POS gepen, naponta - install_backup.bat):
   6. masolat a masolat_mappa-ba, ha be van allitva
   7. allapotfajl: mentes_allapot.json - mikor sikerult utoljara
 
+NAPKOZBENI MENTES (--napkozbeni, aktiv napon 06-16 kozott ketorankent):
+  Ugyanez, de: (a) KIMARAD, ha az elozo mentes ota nincs uj nyugta,
+  naplosor vagy kartya - zart napon igy nem keletkezik ures mentes;
+  (b) kulon mappaba megy (napkozbeni/), es kora alapjan torlodik
+  (napkozbeni_ora, alap 48) - az ejszakai napi/heti rotaciot nem erinti.
+
+Ket mentes soha nem fut egyszerre (mentes.lock).
+
 PROBA-VISSZAALLITAS (--proba ARCHIV, egy MASIK gepen, ahol InterBase fut):
   Az eles POS gepen NEM fut - ha ott a NovoHost adatbazisa, megtagadja.
   Az archivumot visszaallitja egy atmeneti fajlba (gbak -c), a manifesttel
@@ -33,7 +41,8 @@ FONTOS KORLAT:
   es kezzel csinaljuk. VIP-hiba javitasara a naplokbol szamolunk ujra.
 
 FUTTATAS:
-    python backup.py                         napi mentes (POS gep)
+    python backup.py                         ejszakai mentes (POS gep)
+    python backup.py --napkozbeni            napkozbeni mentes (POS gep)
     python backup.py --proba ARCHIV.zip      ellenorzes (teszt gep)
 """
 
@@ -56,6 +65,8 @@ from common import (AGENT_VERSION, HERE, ConfigError, is_windows, load_config, l
                     parse_list, run_isql, run_tool, set_log)
 
 ALLAPOT = os.path.join(HERE, "mentes_allapot.json")
+LOCK = os.path.join(HERE, "mentes.lock")
+LOCK_ELAVULT = 2 * 3600     # ennel regebbi zar egy elszallt futas maradeka
 PREFIX = "novohost_"
 MANIFEST_COLS = ["KARTYA", "NAPLO", "NYUGTA"]
 MANIFEST_SQL = (
@@ -84,6 +95,41 @@ def mb(n):
 # ===========================================================================
 # Allapot
 # ===========================================================================
+
+def load_state():
+    if os.path.exists(ALLAPOT):
+        try:
+            with open(ALLAPOT, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def acquire_lock():
+    """Ket mentes ne fusson egyszerre (pl. egy lassu ejszakai es egy
+    napkozbeni). Az elavult zarat (elszallt futas) eltakaritjuk."""
+    try:
+        if time.time() - os.path.getmtime(LOCK) > LOCK_ELAVULT:
+            os.remove(LOCK)
+            log("Elavult zar torolve (egy korabbi futas elszallhatott).")
+    except OSError:
+        pass
+    try:
+        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except OSError:
+        return False
+    os.write(fd, str(os.getpid()).encode("ascii"))
+    os.close(fd)
+    return True
+
+
+def release_lock():
+    try:
+        os.remove(LOCK)
+    except OSError:
+        pass
+
 
 def save_state(**kw):
     st = {}
@@ -175,6 +221,18 @@ def prune(folder, keep):
             log("   nem torolheto: {0} ({1})".format(f, e))
 
 
+def prune_by_age(folder, hours):
+    limit = time.time() - hours * 3600
+    for f in archives(folder):
+        if os.path.getmtime(f) < limit:
+            try:
+                os.remove(f)
+                log("   torolve ({0} oranal regebbi): {1}".format(
+                    hours, os.path.basename(f)))
+            except OSError as e:
+                log("   nem torolheto: {0} ({1})".format(f, e))
+
+
 def rotate(cfg, new_file):
     napi = os.path.join(cfg.backup["mappa"], "napi")
     heti = os.path.join(cfg.backup["mappa"], "heti")
@@ -211,16 +269,31 @@ def read_counts(cfg):
     return dict((k, int(float(rows[0][k] or 0))) for k in MANIFEST_COLS)
 
 
-def cmd_mentes(cfg):
+def cmd_mentes(cfg, napkozbeni=False):
     cfg.password("sysdba")
-    napi = os.path.join(cfg.backup["mappa"], "napi")
-    if not os.path.isdir(napi):
-        os.makedirs(napi)
+    mappa = os.path.join(cfg.backup["mappa"],
+                         "napkozbeni" if napkozbeni else "napi")
+    if not os.path.isdir(mappa):
+        os.makedirs(mappa)
     if not os.path.exists(cfg.db_path):
         raise RuntimeError("Nem talalom az adatbazist: " + cfg.db_path)
 
+    log("1. manifest (darabszamok a mentes elott)")
+    counts = read_counts(cfg)
+    log("   kartya: {KARTYA}, utolso naplo ID: {NAPLO}, utolso nyugta ID: "
+        "{NYUGTA}".format(**counts))
+
+    if napkozbeni:
+        elozo = load_state().get("utolso_darabszamok")
+        if elozo == counts:
+            log("   Nincs uj nyugta, naplosor vagy kartya az elozo mentes ota "
+                "- a napkozbeni mentes kimarad.")
+            save_state(utolso_napkozbeni_kihagyva=time.strftime(
+                "%Y-%m-%d %H:%M:%S"))
+            return
+
     db_size = os.path.getsize(cfg.db_path)
-    free = shutil.disk_usage(napi).free
+    free = shutil.disk_usage(mappa).free
     log("DB: {0:.0f} MB, szabad hely: {1:.0f} MB".format(mb(db_size),
                                                          mb(free)))
     if free < 2 * db_size:
@@ -229,14 +302,9 @@ def cmd_mentes(cfg):
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
     base = "{0}{1}_{2}".format(PREFIX, tag(cfg), stamp)
-    gbk = os.path.join(napi, base + ".gbk")
-    man_path = os.path.join(napi, base + ".json")
-    arch = os.path.join(napi, base + archiv_ext(cfg))
-
-    log("1. manifest (darabszamok a mentes elott)")
-    counts = read_counts(cfg)
-    log("   kartya: {KARTYA}, utolso naplo ID: {NAPLO}, utolso nyugta ID: "
-        "{NYUGTA}".format(**counts))
+    gbk = os.path.join(mappa, base + ".gbk")
+    man_path = os.path.join(mappa, base + ".json")
+    arch = os.path.join(mappa, base + archiv_ext(cfg))
 
     log("2. gbak mentes -> " + os.path.basename(gbk))
     t0 = time.time()
@@ -254,7 +322,8 @@ def cmd_mentes(cfg):
 
     manifest = {
         "helyszin": cfg.helyszin, "gep": socket.gethostname(),
-        "mentes_kezdete": stamp, "db_meret_mb": round(mb(db_size), 1),
+        "mentes_kezdete": stamp, "napkozbeni": napkozbeni,
+        "db_meret_mb": round(mb(db_size), 1),
         "gbk_meret_mb": round(mb(gbk_size), 1), "darabszamok": counts,
         "megjegyzes": "A darabszamok a gbak INDITASA ELOTT keszultek. A "
                       "visszaallitott DB-ben legalabb ennyi kell legyen.",
@@ -272,34 +341,50 @@ def cmd_mentes(cfg):
     arch_size = os.path.getsize(arch)
     log("   kesz, {0:.1f} MB".format(mb(arch_size)))
 
-    log("4. rotacio")
-    rotate(cfg, arch)
+    ora = cfg.backup["napkozbeni_ora"]
+    if napkozbeni:
+        log("4. torles: {0} oranal regebbi napkozbeni mentesek".format(ora))
+        prune_by_age(mappa, ora)
+    else:
+        log("4. rotacio")
+        rotate(cfg, arch)
 
     masolat_ok = None
     dst = cfg.backup["masolat_mappa"]
     if dst:
+        if napkozbeni:
+            dst = os.path.join(dst, "napkozbeni")
         log("5. masolat -> " + dst)
         try:
             if not os.path.isdir(dst):
                 os.makedirs(dst)
             shutil.copy2(arch, dst)
-            prune(dst, cfg.backup["napi_db"] + cfg.backup["heti_db"])
+            if napkozbeni:
+                prune_by_age(dst, ora)
+            else:
+                prune(dst, cfg.backup["napi_db"] + cfg.backup["heti_db"])
             masolat_ok = True
             log("   kesz")
         except Exception as e:
             masolat_ok = False
             log("   HIBA: a kulso masolat nem sikerult: {0}".format(e))
 
-    save_state(utolso_mentes=time.strftime("%Y-%m-%d %H:%M:%S"),
-               utolso_fajl=os.path.basename(arch),
-               db_meret_mb=round(mb(db_size), 1),
-               gbk_meret_mb=round(mb(gbk_size), 1),
-               archiv_meret_mb=round(mb(arch_size), 1),
-               darabszamok=counts, masolat_ok=masolat_ok, utolso_hiba=None,
-               mentesek={
-                   "napi": [os.path.basename(f) for f in archives(napi)],
-                   "heti": [os.path.basename(f) for f in archives(
-                       os.path.join(cfg.backup["mappa"], "heti"))]})
+    most = time.strftime("%Y-%m-%d %H:%M:%S")
+    mentesek = dict(
+        (d, [os.path.basename(f) for f in archives(
+            os.path.join(cfg.backup["mappa"], d))])
+        for d in ("napi", "heti", "napkozbeni"))
+    kozos = dict(utolso_darabszamok=counts, masolat_ok=masolat_ok,
+                 utolso_hiba=None, mentesek=mentesek)
+    if napkozbeni:
+        save_state(utolso_napkozbeni=most,
+                   utolso_napkozbeni_fajl=os.path.basename(arch), **kozos)
+    else:
+        save_state(utolso_mentes=most, utolso_fajl=os.path.basename(arch),
+                   db_meret_mb=round(mb(db_size), 1),
+                   gbk_meret_mb=round(mb(gbk_size), 1),
+                   archiv_meret_mb=round(mb(arch_size), 1),
+                   darabszamok=counts, **kozos)
     if masolat_ok is False:
         sys.exit(3)
 
@@ -384,17 +469,26 @@ def main():
     ap.add_argument("--proba", metavar="ARCHIV",
                     help="proba-visszaallitas ebbol az archivumbol "
                          "(MASIK gepen)")
+    ap.add_argument("--napkozbeni", action="store_true",
+                    help="napkozbeni mentes: kimarad, ha nincs uj adat")
     ap.add_argument("--ezen-a-gepen", action="store_true",
                     help="a probat akkor is engedi, ha ez POS gepnek latszik")
     args = ap.parse_args()
     set_log(os.path.join(HERE, "mentes_log.txt"))
-    log("backup - verzio {0}".format(AGENT_VERSION))
+    log("backup{0} - verzio {1}".format(
+        " --napkozbeni" if args.napkozbeni else "", AGENT_VERSION))
     cfg = load_config()
     try:
         if args.proba:
             cmd_proba(cfg, args.proba, args.ezen_a_gepen)
         else:
-            cmd_mentes(cfg)
+            if not acquire_lock():
+                log("Mar fut egy mentes - ez a futas kimarad.")
+                return
+            try:
+                cmd_mentes(cfg, napkozbeni=args.napkozbeni)
+            finally:
+                release_lock()
     except Exception as e:
         log("HIBA: {0}".format(e))
         if args.proba:

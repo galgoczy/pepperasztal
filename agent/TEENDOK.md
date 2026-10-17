@@ -19,26 +19,17 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 
 ## Folyamatban
 
-- **A mentés ütemezett feladata:** ellenőrizni, hogy a `PepperHouse-Mentes`
-  fel van-e telepítve, és a „Next Run Time" nem N/A.
+- **Mentés ütemezése – Szentkirályi:** az új `install_backup.bat` újrafuttatása
+  (éjszakai + napközbeni feladat), majd mindkettőnél „Next Run Time" ≠ N/A.
 
 ## Később
 
-- **Napközbeni mentés: aktív napon 06:00 és 16:00 között 2 óránként.** Egy
-  157 MB-os adatbázis mentése 8 mp volt, ez napközben sem terheli a kasszát.
-  Amikor sorra kerül:
-  - **Ütemezés:** az `install_backup.bat` napi feladata kapjon egy második,
-    napközbeni feladatot (`/SC DAILY /ST 06:00 /RI 120 /DU 10:00`), vagy a
-    meglévő éjszakai mellett ez legyen az alap.
-  - **„Aktív nap":** ne a hét napjai alapján döntsünk, hanem a mentés
-    maradjon ki, ha az előző mentés óta nincs új nyugta. A manifestben ott az
-    utolsó nyugta-azonosító, ezt kell összevetni.
-  - **Rotáció átalakítása – enélkül nem élesíthető.** Napi 6 mentésnél a
-    mostani `napi_db = 7` alig több mint egy napot őrizne meg. Új szabály:
-    az elmúlt 24–48 óra minden mentése marad, régebbről naponta csak az
-    utolsó, és a hetiek, mint most.
-  - **Méret:** a 14 MB-os archívummal ez napi kb. 85 MB, bőven elfér. Nagyobb
-    helyszínen előbb mérni kell.
+- **Majdnem élő frissítés a dashboardon** (a végén): a felhasználó pár
+  másodperces frissítést lásson. Az ügynök állandóan futó folyamat legyen,
+  percenkénti őrfeladattal (a Feladatütemező percnél sűrűbben nem indít), és
+  változó ütemben jelentsen: nyitvatartásban 3–5 mp, éjjel 30–60 mp. A
+  `KARTYANAPLO` ID-tartományos lekérdezése elhanyagolható terhelés. A
+  Hostinger kéréskorlátait előtte meg kell nézni.
 - **Vonalkód-teszt a régi USB-s olvasóval.** Telefon maximális fényerőn,
   először Jegyzettömbbe olvasva: beolvassa-e a kijelzőt, és helyesen
   érkeznek-e a `;` és `?` karakterek. Utána a NovoHost VIP-kártyás ablakában

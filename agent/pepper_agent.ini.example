@@ -58,6 +58,9 @@ mappa = C:\PepperApp\backup
 napi_db = 7
 heti_db = 4
 
+; A napkozbeni (06-16, ketorankenti) mentesek ennyi oraig maradnak meg.
+napkozbeni_ora = 48
+
 ; Titkositas (ajanlott, ha a masolat felhobe megy): 7-Zip, AES-256.
 ; Az archiv-jelszot TAROLD A GEPEN KIVUL IS (jelszokezelo) - ha a gep
 ; meghal, a DPAPI-blob vele hal, es a mentes nem lesz kibonthato.

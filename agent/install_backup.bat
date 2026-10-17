@@ -2,9 +2,15 @@
 REM ======================================================================
 REM  install_backup.bat
 REM  --------------------------------------------------------------------
-REM  Egy utemezett feladat a Windows Feladatutemezoben, SYSTEM fiokkal:
+REM  Ket utemezett feladat a Windows Feladatutemezoben, SYSTEM fiokkal:
 REM
-REM    PepperHouse-Mentes        naponta, alapbol 04:15   backup.py
+REM    PepperHouse-Mentes             naponta, alapbol 04:15   backup.py
+REM    PepperHouse-Mentes-Napkozbeni  naponta 06:00-16:00, ketorankent
+REM                                   backup.py --napkozbeni
+REM
+REM  A napkozbeni mentes kimarad, ha az elozo mentes ota nem volt uj nyugta,
+REM  igy zart napon nem keletkezik felesleges mentes. Az idoablak lent, a
+REM  NAPSTART / NAPDUR / NAPRI valtozokban allithato.
 REM
 REM  A proba-visszaallitas SZANDEKOSAN nincs itt: az nem az eles POS gepre
 REM  valo, hanem egy kulon teszt gepre (lasd README, "Mentes ellenorzese").
@@ -32,6 +38,12 @@ setlocal
 
 set "TASK=PepperHouse-Mentes"
 set "TASKP=PepperHouse-Mentes-Proba"
+set "TASKN=PepperHouse-Mentes-Napkozbeni"
+REM 06:00-tol 10 ora 5 percen at 120 percenkent: 06,08,10,12,14,16. Az 5 perc
+REM rahagyas azert kell, hogy a 16:00-s futas meg az ablakba essen.
+set "NAPSTART=06:00"
+set "NAPDUR=10:05"
+set "NAPRI=120"
 set "SCRIPTDIR=%~dp0"
 set "SCRIPT=%SCRIPTDIR%backup.py"
 set "STARTTIME=04:15"
@@ -89,6 +101,7 @@ if not errorlevel 1 goto :storepython
 echo Python      : %PYEXE%
 echo Script      : %SCRIPT%
 echo Napi mentes : %STARTTIME%
+echo Napkozben   : %NAPSTART%-tol %NAPRI% percenkent, %NAPDUR% oran at
 echo.
 
 schtasks /Query /TN "%TASK%" >nul 2>&1
@@ -97,10 +110,16 @@ REM Egy korabbi verzio a POS gepen proba-visszaallitast is utemezett -
 REM ha megvan, toroljuk.
 schtasks /Query /TN "%TASKP%" >nul 2>&1
 if not errorlevel 1 schtasks /Delete /TN "%TASKP%" /F >nul 2>&1
+schtasks /Query /TN "%TASKN%" >nul 2>&1
+if not errorlevel 1 schtasks /Delete /TN "%TASKN%" /F >nul 2>&1
 
 schtasks /Create /TN "%TASK%" /TR "\"%PYEXE%\" \"%SCRIPT%\"" /SC DAILY /ST %STARTTIME% /RU SYSTEM /RL HIGHEST /F >nul
 if errorlevel 1 goto :createfailed
 call :harden "%TASK%"
+
+schtasks /Create /TN "%TASKN%" /TR "\"%PYEXE%\" \"%SCRIPT%\" --napkozbeni" /SC DAILY /ST %NAPSTART% /RI %NAPRI% /DU %NAPDUR% /K /RU SYSTEM /RL HIGHEST /F >nul
+if errorlevel 1 goto :createfailed
+call :harden "%TASKN%"
 
 echo.
 echo ============================================================
@@ -111,13 +130,18 @@ echo  Most futtass le egy mentest kezzel, es nezd meg az eredmenyt:
 echo     schtasks /Run /TN "%TASK%"
 echo     (par perc mulva)  type "%SCRIPTDIR%mentes_log.txt"
 echo.
-echo  A "Next Run Time" ne legyen N/A:
+echo  A napkozbeni mentes kezzel (kimarad, ha nincs uj adat):
+echo     schtasks /Run /TN "%TASKN%"
+echo.
+echo  A "Next Run Time" ne legyen N/A (mindket feladatnal):
 echo     schtasks /Query /TN "%TASK%" /V /FO LIST
+echo     schtasks /Query /TN "%TASKN%" /V /FO LIST
 echo.
 goto :end
 
 :remove
 schtasks /Delete /TN "%TASK%" /F
+schtasks /Delete /TN "%TASKN%" /F
 schtasks /Delete /TN "%TASKP%" /F >nul 2>&1
 goto :end
 

@@ -26,7 +26,7 @@ import time
 
 # Minden kiadasnal noveld - a scriptek indulaskor kiirjak, igy egy
 # hibajelentesbol azonnal latszik, melyik verzio fut a gepen.
-AGENT_VERSION = "2026-10-17.3"
+AGENT_VERSION = "2026-10-17.4"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INI_PATH = os.path.join(HERE, "pepper_agent.ini")
@@ -68,6 +68,7 @@ class Config(object):
             "masolat_mappa": "",
             "napi_db": 7,
             "heti_db": 4,
+            "napkozbeni_ora": 48,
             "sevenzip": "",
             "archiv_jelszo": None,
         }
@@ -151,6 +152,8 @@ def load_config(path=INI_PATH):
                                      fallback="").strip()
         b["napi_db"] = cfg.getint("backup", "napi_db", fallback=b["napi_db"])
         b["heti_db"] = cfg.getint("backup", "heti_db", fallback=b["heti_db"])
+        b["napkozbeni_ora"] = cfg.getint("backup", "napkozbeni_ora",
+                                         fallback=b["napkozbeni_ora"])
         b["sevenzip"] = cfg.get("backup", "sevenzip", fallback="").strip()
         b["archiv_jelszo"] = _read_password(cfg, "backup")
     return c

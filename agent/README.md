@@ -54,6 +54,16 @@ install_backup.bat                 (jobb klikk → Futtatás rendszergazdaként)
 schtasks /Run /TN "PepperHouse-Mentes"
 ```
 
+Két ütemezett feladat jön létre:
+
+| Feladat | Mikor | Mit csinál |
+|---|---|---|
+| `PepperHouse-Mentes` | éjjel, alapból 04:15 | mindig ment; 7 napi + 4 heti marad meg |
+| `PepperHouse-Mentes-Napkozbeni` | 06:00–16:00, kétóránként | csak ha az előző mentés óta volt új nyugta vagy kártyamozgás; a `napkozbeni` mappába megy, 48 óráig marad meg |
+
+A napközbeni mentés így „aktív napon" fut: zárva tartott napon kimarad, és
+nem keletkezik felesleges mentés. Két mentés soha nem fut egyszerre.
+
 A `mentes_log.txt` kiírja az adatbázis, a `.gbk` és az archívum méretét. A
 `mentes_allapot.json` mindig mutatja az utolsó sikeres mentést és a meglévő
 mentéseket.
