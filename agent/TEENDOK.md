@@ -19,11 +19,8 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 
 ## Folyamatban
 
-- **Szentkirályi átállítása az új verzióra (2026-10-17.6):** fájlcsere,
-  `setup_users.py letrehoz` (szűkíti a `PEPPER_OLVAS`-t), `[felho]` az
-  ini-be, `install_jelentes.bat`, újra az `install_backup.bat` (napközbeni
-  mentés). Lépések: README, 7. pont.
-- **RSR bekötése tesztre:** README, 7. pont.
+- **Szentkirályi:** átállítva, percenként jelent az adminnak (2026-10-17).
+  Most erre az egy helyszínre koncentrálunk.
 - **Admin-belépés:** `admin_users` → `'nev' => 'gmail-cím'`, Google OAuth
   kliens a konfigurációba, utána passkey felvétele (`admin/README.md`, 3.
   pont).
@@ -32,6 +29,9 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   sosem írja felül).
 
 ## Később
+
+- **További helyszínek: RSR és TTK** (itt lehet tesztelni). Félretéve, amíg
+  Szentkirályi stabil. Lépések: README, 7. pont.
 
 - **Majdnem élő frissítés a dashboardon** (a végén): a felhasználó pár
   másodperces frissítést lásson. Az ügynök állandóan futó folyamat legyen,
