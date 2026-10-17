@@ -3,6 +3,6 @@ agent/pepper_agent.ini
 agent/*_log.txt
 agent/*allapot.json*
 agent/felderites_*.txt
-agent/mentesek/
+agent/backup/
 __pycache__/
 *.pyc

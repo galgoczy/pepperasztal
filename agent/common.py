@@ -57,7 +57,7 @@ class Config(object):
             "vip": ["PEPPER_VIP", None],
         }
         self.backup = {
-            "mappa": os.path.join(HERE, "mentesek"),
+            "mappa": os.path.join(HERE, "backup"),
             "masolat_mappa": "",
             "napi_db": 7,
             "heti_db": 4,

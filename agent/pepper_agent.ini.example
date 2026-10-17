@@ -42,10 +42,12 @@ password_dpapi =
 
 [backup]
 ; Helyi mentesek. NE a Program Files ala (VirtualStore-csapda).
-mappa = C:\PepperAgent\mentesek
+; A pontos meretet (DB / gbk / archivum) az elso futas naploja kiirja.
+mappa = C:\PepperApp\backup
 
-; Masolat a gepen KIVUL - enelkul egy lemezhiba a mentest is viszi.
-; Lehet halozati megosztas vagy egy felhos szinkron mappa (OneDrive stb.).
+; Masolat a gepen KIVUL (opcionalis). Enelkul egy lemezhiba, lopas vagy
+; zsarolovirus az adatbazist ES a mentest is viszi. Kesobb a dashboard
+; titkositott feltoltese valthatja ki.
 ; masolat_mappa = \\NAS\pepper\mentesek\Knorr105
 
 ; Megorzes: ennyi napi es ennyi heti mentes marad meg.

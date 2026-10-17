@@ -6,8 +6,8 @@ Ez a 0. fázis: **mentés, korlátozott adatbázis-felhasználók és felderít�
 
 | Fájl | Mit csinál | Ír az adatbázisba? |
 |---|---|---|
-| `backup.py` | napi `gbak` mentés, rotáció, külső másolat, heti próba-visszaállítás | nem |
-| `install_backup.bat` | a fenti ütemezett feladatként, SYSTEM fiókkal | nem |
+| `backup.py` | napi `gbak` mentés manifesttel, rotáció; `--proba`: ellenőrzés egy **másik** gépen | nem |
+| `install_backup.bat` | a napi mentés ütemezett feladatként, SYSTEM fiókkal | nem |
 | `setup_users.py` | `PEPPER_OLVAS` és `PEPPER_VIP` felhasználó és a jogaik | csak jogosultságot (GRANT) |
 | `felderites.py` | csak olvasó felmérés a VIP-app tervezéséhez | nem (READ ONLY tranzakció) |
 | `common.py` | közös isql/ini/DPAPI réteg | – |
@@ -20,7 +20,8 @@ szervert, ezért minden az `isql.exe`-n, `gbak.exe`-n, `gsec.exe`-n keresztül m
 
 ## 1. Telepítés
 
-1. Másold a mappát pl. `C:\PepperAgent\` alá.
+1. Másold az `agent` mappa tartalmát a `C:\PepperApp\` mappába. Minden itt
+   él: scriptek, ini, naplók, és a mentések a `C:\PepperApp\backup` alatt.
    **Ne a `Program Files` alá:** a nem emelt jogú írás oda a VirtualStore-ba
    kerül, és a SYSTEM-ként futó feladat nem látja.
 
@@ -28,7 +29,7 @@ szervert, ezért minden az `isql.exe`-n, `gbak.exe`-n, `gsec.exe`-n keresztül m
    (a jelszavak miatt). Rendszergazdai parancssorban:
 
    ```
-   icacls C:\PepperAgent /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F
+   icacls C:\PepperApp /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F
    ```
    A SID-ek (`S-1-5-32-544` = Rendszergazdák, `S-1-5-18` = SYSTEM) magyar
    Windows-on is működnek, ahol a csoportnevek lefordítva szerepelnek.
@@ -48,24 +49,46 @@ szervert, ezért minden az `isql.exe`-n, `gbak.exe`-n, `gsec.exe`-n keresztül m
 ```
 install_backup.bat                 (jobb klikk → Futtatás rendszergazdaként)
 schtasks /Run /TN "PepperHouse-Mentes"
-schtasks /Run /TN "PepperHouse-Mentes-Proba"
 ```
 
-Ellenőrizd a `mentes_log.txt`-ben, hogy mindkettő sikerült. A
-`mentes_allapot.json` mindig mutatja az utolsó sikeres mentést és próbát.
+A `mentes_log.txt` kiírja az adatbázis, a `.gbk` és az archívum méretét. A
+`mentes_allapot.json` mindig mutatja az utolsó sikeres mentést és a meglévő
+mentéseket.
 
-- **Állíts be `masolat_mappa`-t.** Enélkül a mentés ugyanazon a lemezen van,
-  mint az adatbázis, és egy lemezhiba mindkettőt viszi.
-- Ha a másolat felhőbe megy, kapcsold be a 7-Zip titkosítást, és **az
-  archívum jelszavát tárold a gépen kívül is** (jelszókezelő). Ha a gép
-  meghal, a DPAPI-blob vele hal.
+Minden archívumban a `.gbk` mellett egy **manifest** is van: a kártyák száma,
+az utolsó naplósor- és nyugta-azonosító a mentés pillanatában. Ebből
+bizonyítható később, hogy a mentés **teljes**, nem csak olvasható.
+
+- **Ugyanazon a gépen** marad, a `C:\PepperApp\backup` alatt (7 napi + 4
+  heti; az ini-ben növelhető). Ez véd a hibás írás és a sérült adatbázis
+  ellen, de **nem véd** a lemezhiba, a lopás és a zsarolóvírus ellen: ezek az
+  adatbázist és a mentést együtt viszik. Ezért a `masolat_mappa`, később pedig
+  a dashboardra titkosítva feltöltött másolat.
 - **Mire jó és mire nem:** katasztrófánál (halott lemez, sérült adatbázis) a
-  teljes visszaállítás a megoldás. Egy VIP-egyenleghiba javítására viszont
-  nem – az a pénztári forgalmat is visszavinné. Azt a naplókból kell
+  teljes visszaállítás a megoldás, **kézzel**. Egy VIP-egyenleghiba javítására
+  viszont nem – az a pénztári forgalmat is visszavinné. Azt a naplókból kell
   újraszámolni.
 
 Miért SYSDBA-val? InterBase 6-on a `gbak`-ot csak a SYSDBA vagy az adatbázis
 tulajdonosa futtathatja; a korlátozott felhasználók nem tudnak menteni.
+
+### A mentés ellenőrzése – egy MÁSIK gépen
+
+Éles POS gépen **nem** állítunk vissza. A `backup.py --proba` meg is tagadja,
+ha a gépen ott a NovoHost adatbázisa.
+
+Kell hozzá egy teszt gép (irodai PC vagy virtuális gép), rajta InterBase 6
+– ugyanaz a verzió, mint a kasszákon –, Python, és ez a mappa. Az ini-ben a
+`[sysdba]` a **teszt gép** InterBase-ének jelszava, nem a kasszáé.
+
+```
+python backup.py --proba D:\mentesek\novohost_Knorr105_2026-10-17_041500.zip
+```
+
+Visszaállítja egy átmeneti fájlba, összeveti a manifesttel, majd törli.
+Akkor jó a mentés, ha a visszaállított adatbázisban legalább annyi kártya,
+naplósor és nyugta van, mint a manifestben. Új helyszín első mentésénél
+kötelező, utána havonta egy-egy minta elég.
 
 ## 3. Korlátozott felhasználók
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-backup.py - a NovoHost adatbazis mentese, rotacioval es proba-visszaallitassal.
+backup.py - a NovoHost adatbazis mentese, es a mentes ellenorzese MASIK gepen.
 
 MIERT KULON SCRIPT, ES MIERT SYSDBA?
   InterBase 6-on a gbak mentest csak a SYSDBA vagy az adatbazis tulajdonosa
@@ -9,28 +9,32 @@ MIERT KULON SCRIPT, ES MIERT SYSDBA?
   pepper_agent.ini-bol jon (DPAPI-val titkositva), kornyezeti valtozon at
   adjuk at a gbak-nak, sosem parancssoron.
 
-MIT CSINAL (alap futas, naponta):
+MENTES (a POS gepen, naponta - install_backup.bat):
   1. ellenorzi a szabad helyet (legalabb a DB meretenek 2x-ese)
-  2. gbak -b -g: mentes futas kozben, a kassza nem all meg. A -g kikapcsolja
+  2. MANIFEST: par darabszam a mentes pillanatabol (kartyak szama, utolso
+     naplo- es nyugta-ID). Ezzel bizonyithato kesobb, hogy a mentes TELJES.
+  3. gbak -b -g: mentes futas kozben, a kassza nem all meg. A -g kikapcsolja
      a mentes alatti szemetgyujtest - kevesebb terheles az eles szerveren.
-  3. tomorit (zip, vagy 7-Zip AES-256 titkositassal, ha be van allitva)
-  4. rotacio: napi_db napi + heti_db heti mentes marad
-  5. masolat a masolat_mappa-ba (NAS, masik gep, felhos szinkron mappa)
-  6. allapotfajl: mentes_allapot.json - mikor sikerult utoljara
+  4. tomorit: .gbk + manifest egy archivumba (zip, vagy 7-Zip AES-256)
+  5. rotacio: napi_db napi + heti_db heti mentes marad
+  6. masolat a masolat_mappa-ba, ha be van allitva
+  7. allapotfajl: mentes_allapot.json - mikor sikerult utoljara
 
-PROBA-VISSZAALLITAS (--proba, hetente):
-  A legujabb mentest visszaallitja egy ATMENETI fajlba (gbak -c), belenez,
-  majd torli. Az eles adatbazishoz nem nyul. A soha ki nem probalt mentes
-  csak remeny.
+PROBA-VISSZAALLITAS (--proba ARCHIV, egy MASIK gepen, ahol InterBase fut):
+  Az eles POS gepen NEM fut - ha ott a NovoHost adatbazisa, megtagadja.
+  Az archivumot visszaallitja egy atmeneti fajlba (gbak -c), a manifesttel
+  osszeveti, majd torli. Ha a visszaallitott adatbazis legalabb annyi
+  kartyat, naplosort es nyugtat tartalmaz, mint a manifest, a mentes teljes.
+  A soha ki nem probalt mentes csak remeny.
 
 FONTOS KORLAT:
   A teljes visszaallitas az eles POS-on a forgalmat is visszavinne a mentes
-  allapotaba - ez csak katasztrofanal jarhato ut (halott lemez, serult DB).
-  VIP-hiba javitasara a naplokbol szamolunk ujra, nem mentesbol.
+  allapotaba - ez csak katasztrofanal jarhato ut (halott lemez, serult DB),
+  es kezzel csinaljuk. VIP-hiba javitasara a naplokbol szamolunk ujra.
 
 FUTTATAS:
-    python backup.py            napi mentes
-    python backup.py --proba    proba-visszaallitas a legujabb mentesbol
+    python backup.py                         napi mentes (POS gep)
+    python backup.py --proba ARCHIV.zip      ellenorzes (teszt gep)
 """
 
 import argparse
@@ -39,6 +43,7 @@ import datetime
 import glob
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -52,6 +57,12 @@ from common import (HERE, ConfigError, is_windows, load_config, log,
 
 ALLAPOT = os.path.join(HERE, "mentes_allapot.json")
 PREFIX = "novohost_"
+MANIFEST_COLS = ["KARTYA", "NAPLO", "NYUGTA"]
+MANIFEST_SQL = (
+    "SET LIST ON;\n"
+    "SELECT (SELECT COUNT(*) FROM KARTYATORZS) AS KARTYA,"
+    " (SELECT MAX(ID) FROM KARTYANAPLO) AS NAPLO,"
+    " (SELECT MAX(ID) FROM NYUGTAFEJ) AS NYUGTA FROM RDB$DATABASE;")
 
 
 def gbak_exe():
@@ -63,8 +74,11 @@ def archiv_ext(cfg):
 
 
 def tag(cfg):
-    import re
     return re.sub(r"[^A-Za-z0-9]+", "", cfg.helyszin or socket.gethostname())
+
+
+def mb(n):
+    return n / 1048576.0
 
 
 # ===========================================================================
@@ -88,7 +102,7 @@ def save_state(**kw):
 # Tomorites
 # ===========================================================================
 
-def pack(cfg, src, dst):
+def pack(cfg, srcs, dst):
     sz = cfg.backup["sevenzip"]
     if sz:
         pw = cfg.backup["archiv_jelszo"]
@@ -96,7 +110,7 @@ def pack(cfg, src, dst):
             raise ConfigError("[backup] sevenzip be van allitva, de nincs "
                               "archiv-jelszo (password / password_dpapi).")
         rc = subprocess.call([sz, "a", "-t7z", "-mx=5", "-mhe=on",
-                              "-p" + pw, dst, src],
+                              "-p" + pw, dst] + list(srcs),
                              stdout=subprocess.DEVNULL)
         if rc != 0:
             raise RuntimeError("7-Zip hiba, kod {0}".format(rc))
@@ -107,7 +121,8 @@ def pack(cfg, src, dst):
     else:
         with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED,
                              allowZip64=True) as z:
-            z.write(src, os.path.basename(src))
+            for s in srcs:
+                z.write(s, os.path.basename(s))
         with zipfile.ZipFile(dst) as z:
             bad = z.testzip()
         if bad is not None:
@@ -115,22 +130,29 @@ def pack(cfg, src, dst):
 
 
 def unpack(cfg, src, dst_dir):
-    sz = cfg.backup["sevenzip"]
-    if src.endswith(".7z"):
+    """Visszaad: (gbk utvonal, manifest dict vagy None)"""
+    if src.lower().endswith(".7z"):
+        sz = cfg.backup["sevenzip"]
         if not sz:
-            raise ConfigError("7z mentes, de nincs [backup] sevenzip utvonal.")
+            raise ConfigError("7z archivum, de nincs [backup] sevenzip.")
         rc = subprocess.call([sz, "e", "-y", "-p" + (cfg.backup[
             "archiv_jelszo"] or ""), "-o" + dst_dir, src],
             stdout=subprocess.DEVNULL)
         if rc != 0:
-            raise RuntimeError("7-Zip kibontas hiba, kod {0}".format(rc))
+            raise RuntimeError("7-Zip kibontas hiba, kod {0} (jo a "
+                               "jelszo?)".format(rc))
     else:
         with zipfile.ZipFile(src) as z:
             z.extractall(dst_dir)
-    found = glob.glob(os.path.join(dst_dir, "*.gbk"))
-    if not found:
+    gbks = glob.glob(os.path.join(dst_dir, "*.gbk"))
+    if not gbks:
         raise RuntimeError("Az archivumban nincs .gbk fajl.")
-    return found[0]
+    man = None
+    jsons = glob.glob(os.path.join(dst_dir, "*.json"))
+    if jsons:
+        with open(jsons[0], encoding="utf-8") as f:
+            man = json.load(f)
+    return gbks[0], man
 
 
 # ===========================================================================
@@ -138,10 +160,9 @@ def unpack(cfg, src, dst_dir):
 # ===========================================================================
 
 def archives(folder):
-    pats = [os.path.join(folder, PREFIX + "*" + e) for e in (".zip", ".7z")]
     files = []
-    for p in pats:
-        files += glob.glob(p)
+    for e in (".zip", ".7z"):
+        files += glob.glob(os.path.join(folder, PREFIX + "*" + e))
     return sorted(files, key=os.path.getmtime, reverse=True)
 
 
@@ -174,6 +195,17 @@ def rotate(cfg, new_file):
 # Mentes
 # ===========================================================================
 
+def read_counts(cfg):
+    """A manifest szamai. READ ONLY tranzakcio, csak olvas."""
+    out, err = run_isql(cfg, "SET TRANSACTION READ ONLY;\n" + MANIFEST_SQL,
+                        user_key="sysdba")
+    rows = parse_list(out, MANIFEST_COLS)
+    if not rows or not rows[0].get("NYUGTA"):
+        raise RuntimeError("A darabszamok nem olvashatok: " +
+                           (err or out).strip()[:300])
+    return dict((k, int(float(rows[0][k] or 0))) for k in MANIFEST_COLS)
+
+
 def cmd_mentes(cfg):
     cfg.password("sysdba")
     napi = os.path.join(cfg.backup["mappa"], "napi")
@@ -184,18 +216,24 @@ def cmd_mentes(cfg):
 
     db_size = os.path.getsize(cfg.db_path)
     free = shutil.disk_usage(napi).free
-    log("DB: {0:.0f} MB, szabad hely: {1:.0f} MB".format(
-        db_size / 1048576.0, free / 1048576.0))
+    log("DB: {0:.0f} MB, szabad hely: {1:.0f} MB".format(mb(db_size),
+                                                         mb(free)))
     if free < 2 * db_size:
         raise RuntimeError("Keves a hely: legalabb {0:.0f} MB kell.".format(
-            2 * db_size / 1048576.0))
+            mb(2 * db_size)))
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
     base = "{0}{1}_{2}".format(PREFIX, tag(cfg), stamp)
     gbk = os.path.join(napi, base + ".gbk")
+    man_path = os.path.join(napi, base + ".json")
     arch = os.path.join(napi, base + archiv_ext(cfg))
 
-    log("1. gbak mentes -> " + os.path.basename(gbk))
+    log("1. manifest (darabszamok a mentes elott)")
+    counts = read_counts(cfg)
+    log("   kartya: {KARTYA}, utolso naplo ID: {NAPLO}, utolso nyugta ID: "
+        "{NYUGTA}".format(**counts))
+
+    log("2. gbak mentes -> " + os.path.basename(gbk))
     t0 = time.time()
     rc, out, err = run_tool(cfg, gbak_exe(), [
         "-b", "-g", "localhost:" + cfg.db_path, gbk])
@@ -205,25 +243,37 @@ def cmd_mentes(cfg):
             os.remove(gbk)
         raise RuntimeError("gbak hiba (kod {0}): {1}".format(
             rc, (err or out).strip()[:300]))
-    log("   kesz, {0:.0f} MB, {1:.0f} mp".format(
-        os.path.getsize(gbk) / 1048576.0, time.time() - t0))
+    gbk_size = os.path.getsize(gbk)
+    log("   kesz, {0:.1f} MB, {1:.0f} mp".format(mb(gbk_size),
+                                                 time.time() - t0))
 
-    log("2. tomorites -> " + os.path.basename(arch))
+    manifest = {
+        "helyszin": cfg.helyszin, "gep": socket.gethostname(),
+        "mentes_kezdete": stamp, "db_meret_mb": round(mb(db_size), 1),
+        "gbk_meret_mb": round(mb(gbk_size), 1), "darabszamok": counts,
+        "megjegyzes": "A darabszamok a gbak INDITASA ELOTT keszultek. A "
+                      "visszaallitott DB-ben legalabb ennyi kell legyen.",
+    }
+    with open(man_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
+
+    log("3. tomorites -> " + os.path.basename(arch))
     try:
-        pack(cfg, gbk, arch)
+        pack(cfg, [gbk, man_path], arch)
     finally:
-        if os.path.exists(gbk):
-            os.remove(gbk)
+        for p in (gbk, man_path):
+            if os.path.exists(p):
+                os.remove(p)
     arch_size = os.path.getsize(arch)
-    log("   kesz, {0:.1f} MB".format(arch_size / 1048576.0))
+    log("   kesz, {0:.1f} MB".format(mb(arch_size)))
 
-    log("3. rotacio")
+    log("4. rotacio")
     rotate(cfg, arch)
 
     masolat_ok = None
     dst = cfg.backup["masolat_mappa"]
     if dst:
-        log("4. masolat -> " + dst)
+        log("5. masolat -> " + dst)
         try:
             if not os.path.isdir(dst):
                 os.makedirs(dst)
@@ -234,37 +284,46 @@ def cmd_mentes(cfg):
         except Exception as e:
             masolat_ok = False
             log("   HIBA: a kulso masolat nem sikerult: {0}".format(e))
-    else:
-        log("4. masolat: nincs beallitva [backup] masolat_mappa - a mentes "
-            "csak ezen a gepen van!")
 
     save_state(utolso_mentes=time.strftime("%Y-%m-%d %H:%M:%S"),
                utolso_fajl=os.path.basename(arch),
-               utolso_meret_mb=round(arch_size / 1048576.0, 1),
-               masolat_ok=masolat_ok, utolso_hiba=None)
+               db_meret_mb=round(mb(db_size), 1),
+               gbk_meret_mb=round(mb(gbk_size), 1),
+               archiv_meret_mb=round(mb(arch_size), 1),
+               darabszamok=counts, masolat_ok=masolat_ok, utolso_hiba=None,
+               mentesek={
+                   "napi": [os.path.basename(f) for f in archives(napi)],
+                   "heti": [os.path.basename(f) for f in archives(
+                       os.path.join(cfg.backup["mappa"], "heti"))]})
     if masolat_ok is False:
         sys.exit(3)
 
 
 # ===========================================================================
-# Proba-visszaallitas
+# Proba-visszaallitas (MASIK gepen)
 # ===========================================================================
 
-def cmd_proba(cfg):
+def cmd_proba(cfg, src, sajat_gepen):
     cfg.password("sysdba")
-    napi = os.path.join(cfg.backup["mappa"], "napi")
-    arcs = archives(napi)
-    if not arcs:
-        raise RuntimeError("Nincs mentes a(z) {0} mappaban.".format(napi))
-    src = arcs[0]
+    if os.path.exists(cfg.db_path) and not sajat_gepen:
+        raise RuntimeError(
+            "Ez eles POS gepnek latszik (itt van a NovoHost adatbazisa: "
+            "{0}). A proba-visszaallitas egy MASIK gepre valo. Ha tudod, mit "
+            "csinalsz: --ezen-a-gepen".format(cfg.db_path))
+    if not os.path.isfile(src):
+        raise RuntimeError("Nincs ilyen archivum: " + src)
     log("Proba-visszaallitas: " + os.path.basename(src))
 
-    work = tempfile.mkdtemp(prefix="pepper_proba_", dir=cfg.backup["mappa"])
+    root = cfg.backup["mappa"]
+    if not os.path.isdir(root):
+        os.makedirs(root)
+    work = tempfile.mkdtemp(prefix="pepper_proba_", dir=root)
     try:
-        gbk = unpack(cfg, src, work)
+        gbk, man = unpack(cfg, src, work)
         need = 3 * os.path.getsize(gbk)
         if shutil.disk_usage(work).free < need:
-            raise RuntimeError("Keves a hely a proba-visszaallitashoz.")
+            raise RuntimeError("Keves a hely: legalabb {0:.0f} MB "
+                               "kell.".format(mb(need)))
         target = os.path.join(work, "proba.ib")
         t0 = time.time()
         rc, out, err = run_tool(cfg, gbak_exe(), [
@@ -272,29 +331,42 @@ def cmd_proba(cfg):
         if rc != 0 or not os.path.exists(target):
             raise RuntimeError("gbak -c hiba (kod {0}): {1}".format(
                 rc, (err or out).strip()[:300]))
-        log("   visszaallitva, {0:.0f} MB, {1:.0f} mp".format(
-            os.path.getsize(target) / 1048576.0, time.time() - t0))
+        log("   visszaallitva: {0:.1f} MB gbk -> {1:.0f} MB adatbazis, "
+            "{2:.0f} mp".format(mb(os.path.getsize(gbk)),
+                                mb(os.path.getsize(target)),
+                                time.time() - t0))
 
-        # Belenezunk: a fontos tablak olvashatok es nem uresek.
         pcfg = copy.deepcopy(cfg)
         pcfg.db_path = target
-        out, err = run_isql(pcfg, (
-            "SET LIST ON;\n"
-            "SELECT (SELECT COUNT(*) FROM KARTYATORZS) AS KARTYA,"
-            " (SELECT MAX(ID) FROM KARTYANAPLO) AS NAPLO,"
-            " (SELECT MAX(ID) FROM NYUGTAFEJ) AS NYUGTA FROM RDB$DATABASE;"),
-            user_key="sysdba")
-        rows = parse_list(out, ["KARTYA", "NAPLO", "NYUGTA"])
-        if err or not rows or not rows[0].get("NYUGTA"):
+        out, err = run_isql(pcfg, MANIFEST_SQL, user_key="sysdba")
+        rows = parse_list(out, MANIFEST_COLS)
+        if not rows or not rows[0].get("NYUGTA"):
             raise RuntimeError("A visszaallitott DB nem olvashato: " +
-                               (err or out)[:300])
-        r = rows[0]
-        log("   kartya: {0}, utolso naplo ID: {1}, utolso nyugta ID: {2}"
-            .format(r.get("KARTYA"), r.get("NAPLO"), r.get("NYUGTA")))
+                               (err or out).strip()[:300])
+        got = dict((k, int(float(rows[0][k] or 0))) for k in MANIFEST_COLS)
+        log("   visszaallitott: kartya {KARTYA}, naplo ID {NAPLO}, "
+            "nyugta ID {NYUGTA}".format(**got))
+
+        if not man:
+            log("   FIGYELEM: az archivumban nincs manifest (regi mentes) - "
+                "csak az olvashatosagot igazoltuk, a teljesseget nem.")
+            ok = True
+        else:
+            want = man["darabszamok"]
+            log("   manifest:     kartya {KARTYA}, naplo ID {NAPLO}, "
+                "nyugta ID {NYUGTA}".format(**want))
+            hiany = [k for k in MANIFEST_COLS if got[k] < want[k]]
+            ok = not hiany
+            if hiany:
+                log("   HIBA: a visszaallitott DB-bol hianyzik adat: " +
+                    ", ".join(hiany))
         save_state(utolso_proba=time.strftime("%Y-%m-%d %H:%M:%S"),
                    utolso_proba_fajl=os.path.basename(src),
-                   utolso_proba_ok=True)
-        log("A mentes visszaallithato.")
+                   utolso_proba_ok=ok)
+        log("A mentes TELJES es visszaallithato." if ok else
+            "A MENTES NEM TELJES.")
+        if not ok:
+            sys.exit(4)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -303,14 +375,17 @@ def cmd_proba(cfg):
 
 def main():
     ap = argparse.ArgumentParser(description="NovoHost mentes.")
-    ap.add_argument("--proba", action="store_true",
-                    help="proba-visszaallitas a legujabb mentesbol")
+    ap.add_argument("--proba", metavar="ARCHIV",
+                    help="proba-visszaallitas ebbol az archivumbol "
+                         "(MASIK gepen)")
+    ap.add_argument("--ezen-a-gepen", action="store_true",
+                    help="a probat akkor is engedi, ha ez POS gepnek latszik")
     args = ap.parse_args()
     set_log(os.path.join(HERE, "mentes_log.txt"))
     cfg = load_config()
     try:
         if args.proba:
-            cmd_proba(cfg)
+            cmd_proba(cfg, args.proba, args.ezen_a_gepen)
         else:
             cmd_mentes(cfg)
     except Exception as e:

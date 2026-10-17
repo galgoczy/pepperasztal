@@ -2,10 +2,12 @@
 REM ======================================================================
 REM  install_backup.bat
 REM  --------------------------------------------------------------------
-REM  Ket utemezett feladat a Windows Feladatutemezoben, SYSTEM fiokkal:
+REM  Egy utemezett feladat a Windows Feladatutemezoben, SYSTEM fiokkal:
 REM
 REM    PepperHouse-Mentes        naponta, alapbol 04:15   backup.py
-REM    PepperHouse-Mentes-Proba  vasarnap 05:30           backup.py --proba
+REM
+REM  A proba-visszaallitas SZANDEKOSAN nincs itt: az nem az eles POS gepre
+REM  valo, hanem egy kulon teszt gepre (lasd README, "Mentes ellenorzese").
 REM
 REM  HASZNALAT (jobb klikk -> Futtatas rendszergazdakent):
 REM    install_backup.bat
@@ -87,21 +89,18 @@ if not errorlevel 1 goto :storepython
 echo Python      : %PYEXE%
 echo Script      : %SCRIPT%
 echo Napi mentes : %STARTTIME%
-echo Proba       : vasarnap 05:30
 echo.
 
 schtasks /Query /TN "%TASK%" >nul 2>&1
 if not errorlevel 1 schtasks /Delete /TN "%TASK%" /F >nul 2>&1
+REM Egy korabbi verzio a POS gepen proba-visszaallitast is utemezett -
+REM ha megvan, toroljuk.
 schtasks /Query /TN "%TASKP%" >nul 2>&1
 if not errorlevel 1 schtasks /Delete /TN "%TASKP%" /F >nul 2>&1
 
 schtasks /Create /TN "%TASK%" /TR "\"%PYEXE%\" \"%SCRIPT%\"" /SC DAILY /ST %STARTTIME% /RU SYSTEM /RL HIGHEST /F >nul
 if errorlevel 1 goto :createfailed
 call :harden "%TASK%"
-
-schtasks /Create /TN "%TASKP%" /TR "\"%PYEXE%\" \"%SCRIPT%\" --proba" /SC WEEKLY /D SUN /ST 05:30 /RU SYSTEM /RL HIGHEST /F >nul
-if errorlevel 1 goto :createfailed
-call :harden "%TASKP%"
 
 echo.
 echo ============================================================
@@ -112,9 +111,6 @@ echo  Most futtass le egy mentest kezzel, es nezd meg az eredmenyt:
 echo     schtasks /Run /TN "%TASK%"
 echo     (par perc mulva)  type "%SCRIPTDIR%mentes_log.txt"
 echo.
-echo  Utana a proba-visszaallitast is:
-echo     schtasks /Run /TN "%TASKP%"
-echo.
 echo  A "Next Run Time" ne legyen N/A:
 echo     schtasks /Query /TN "%TASK%" /V /FO LIST
 echo.
@@ -122,7 +118,7 @@ goto :end
 
 :remove
 schtasks /Delete /TN "%TASK%" /F
-schtasks /Delete /TN "%TASKP%" /F
+schtasks /Delete /TN "%TASKP%" /F >nul 2>&1
 goto :end
 
 :noscript
