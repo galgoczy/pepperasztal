@@ -11,6 +11,13 @@ pa_security_headers();
 header('Cache-Control: no-store');
 $st = pa_status();
 
+// A health.php gepi (ekezet nelkuli) allapotai magyarul az oldalon.
+const DB_LABEL = [
+    'ok'              => 'működik',
+    'hiba'            => 'nem érhető el',
+    'nincs beallitva' => 'nincs beállítva',
+];
+
 function row(string $label, string $value, bool $good): string
 {
     return sprintf('<tr><th>%s</th><td class="%s">%s</td></tr>',
@@ -55,7 +62,7 @@ function row(string $label, string $value, bool $good): string
     <?= row('Build (commit)', $st['build'], true) ?>
     <?= row('PHP', $st['php'], version_compare($st['php'], '7.4', '>=')) ?>
     <?= row('Konfiguráció', $st['config'] ? 'megvan' : 'hiányzik', $st['config']) ?>
-    <?= row('Adatbázis', $st['db'], $st['db'] === 'ok') ?>
+    <?= row('Adatbázis', DB_LABEL[$st['db']] ?? $st['db'], $st['db'] === 'ok') ?>
   </table>
 </main>
 </body>
