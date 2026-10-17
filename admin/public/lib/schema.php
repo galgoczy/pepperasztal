@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-const PA_SCHEMA_VERSION = 1;
+const PA_SCHEMA_VERSION = 2;
 
 function pa_is_sqlite(): bool
 {
@@ -58,6 +58,17 @@ function pa_migrate(): void
         id $pk,
         ip VARCHAR(45) NOT NULL,
         ido VARCHAR(19) NOT NULL)$tail");
+    // 2: passkeyek (a nyilvanos kulcs PEM-ben, a kulcsazonosito base64url)
+    $db->exec("CREATE TABLE IF NOT EXISTS passkey (
+        id $pk,
+        felhasznalo VARCHAR(64) NOT NULL,
+        cred_id VARCHAR(191) NOT NULL UNIQUE,
+        kulcs TEXT NOT NULL,
+        alg INT NOT NULL,
+        szamlalo BIGINT NOT NULL DEFAULT 0,
+        nev VARCHAR(100) NOT NULL,
+        letrehozva VARCHAR(19) NOT NULL,
+        utoljara VARCHAR(19) NULL)$tail");
     if ($sqlite) {
         // MEDIUMTEXT -> sqlite-ban TEXT affinitas, rendben van.
         $db->exec('CREATE INDEX IF NOT EXISTS ix_login_ip ON login_proba (ip, ido)');

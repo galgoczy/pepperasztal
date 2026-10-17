@@ -18,9 +18,23 @@ return [
     'db_user' => 'u000000000_pepperadmin',
     'db_pass' => 'IDE_A_JELSZO',
 
-    // Belepes az adminba. A hash-t a /jelszo.php oldal kesziti (amig nincs
-    // egy felhasznalo sem, belepes nelkul is elerheto).
+    // Ki lephet be: nev => Google e-mail-cim. Belepes Google-fiokkal vagy
+    // passkey-jel; jelszo nincs. Aki innen kikerul, az a passkey-eivel sem
+    // lep be tobbe.
     'admin_users' => [
-        // 'gergely' => '$2y$10$...',
+        // 'gergely' => 'valaki@gmail.com',
     ],
+
+    // Google-belepes (opcionalis). Google Cloud Console -> APIs & Services
+    // -> Credentials -> OAuth client ID (Web application). Engedelyezett
+    // atiranyitasi cim: https://pepperadmin.zentopia.io/google.php
+    'google' => [
+        'client_id' => '',
+        'client_secret' => '',
+    ],
+
+    // Csak az elso passkey felvetelehez, ha Google-belepes nincs: legalabb
+    // 20 veletlen karakter. A /elso-passkey.php oldalon a felhasznalonevvel
+    // egyutt kell megadni. Ha mar van passkey-d, TOROLD ezt a sort.
+    // 'setup_code' => '',
 ];

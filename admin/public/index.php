@@ -8,30 +8,28 @@ $user = pa_user();
 
 // ---- belepes ------------------------------------------------------------
 if ($user === null) {
-    $hiba = null;
-    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-        pa_check_csrf();
-        if (pa_login_blocked()) {
-            $hiba = 'Túl sok hibás próbálkozás. Próbáld újra 15 perc múlva.';
-        } elseif (pa_login(trim((string)($_POST['u'] ?? '')), (string)($_POST['p'] ?? ''))) {
-            pa_redirect('/');
-        } else {
-            $hiba = 'Hibás felhasználónév vagy jelszó.';
-        }
-    }
     pa_page_start('Belépés', null);
     echo '<div class="login"><h1>Belépés</h1>';
+    pa_show_flash();
     if (!pa_users()) {
-        echo '<div class="notice bad">Még nincs felhasználó beállítva. A <a href="/jelszo.php">jelszó-hash</a> '
-            . 'oldalon készíts hash-t, és vedd fel a konfigurációba (<code>admin_users</code>).</div>';
+        echo '<div class="notice bad">Még nincs felhasználó beállítva: a konfiguráció '
+            . '<code>admin_users</code> részébe kell egy sor, pl. '
+            . '<code>\'gergely\' =&gt; \'valaki@gmail.com\',</code></div>';
     }
-    if ($hiba) {
-        echo '<div class="notice bad">' . h($hiba) . '</div>';
+    if (pa_users_legacy()) {
+        echo '<div class="notice bad">A jelszavas belépés megszűnt. A konfigurációban a '
+            . 'jelszó-hash helyére a Google e-mail-cím kerül: <code>\'nev\' =&gt; \'valaki@gmail.com\',</code></div>';
     }
-    echo '<form method="post">' . pa_csrf_field()
-        . '<input type="text" name="u" placeholder="Felhasználónév" autocomplete="username" required>'
-        . '<input type="password" name="p" placeholder="Jelszó" autocomplete="current-password" required>'
-        . '<button class="btn primary">Belépés</button></form></div>';
+    echo '<div class="stack">';
+    if (pa_google_cfg()) {
+        echo '<a class="btn primary" href="/google.php">Belépés Google-fiókkal</a>';
+    }
+    echo '<button class="btn" data-passkey-login>Belépés passkey-jel</button>';
+    echo '</div><div class="notice bad" data-passkey-msg hidden></div>';
+    if (strlen((string)(pa_config()['setup_code'] ?? '')) >= 20) {
+        echo '<p class="sub"><a href="/elso-passkey.php">Első passkey beállító kóddal</a></p>';
+    }
+    echo '</div>';
     pa_page_end();
     exit;
 }
@@ -78,6 +76,10 @@ $rows = $db->query('SELECT h.*, j.ido, j.gep, j.agent_verzio, j.adat
 
 pa_page_start('Helyszínek', $user, 30);
 pa_show_flash();
+if ((string)(pa_config()['setup_code'] ?? '') !== '') {
+    echo '<div class="notice bad">A konfigurációban még ott a <code>setup_code</code>. Ha már van '
+        . '<a href="/passkey.php">passkey-d</a>, töröld ki a sort.</div>';
+}
 ?>
 <h1>Helyszínek</h1>
 <p class="sub">Életjel percenként. Zöld: 3 percen belül, sárga: 15 percen belül.

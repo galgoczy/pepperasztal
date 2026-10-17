@@ -40,6 +40,7 @@ function pa_page_start(string $title, ?string $user, int $refresh = 0): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title><?= h($title) ?> · Pepper Admin</title>
+<meta name="csrf" content="<?= pa_csrf() ?>">
 <link rel="stylesheet" href="/style.css">
 <script src="/app.js" defer></script>
 </head>
@@ -50,7 +51,7 @@ function pa_page_start(string $title, ?string $user, int $refresh = 0): void
   <nav>
     <a href="/">Helyszínek</a>
     <a href="/naplo.php">Napló</a>
-    <a href="/jelszo.php">Jelszó-hash</a>
+    <a href="/passkey.php">Passkeyek</a>
     <form method="post" action="/kilepes.php"><?= pa_csrf_field() ?><button class="link"><?= h($user) ?> · Kilépés</button></form>
   </nav>
 <?php endif; ?>

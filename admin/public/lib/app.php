@@ -6,6 +6,7 @@ require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/schema.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/kiadas.php';
+require_once __DIR__ . '/google.php';
 require __DIR__ . '/ui.php';
 
 if (!pa_config_path()) {

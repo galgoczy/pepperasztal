@@ -38,15 +38,34 @@ GitHub → a repó → Settings → Secrets and variables → Actions:
 `pepperadmin-config.php` a webmappa fölött (1–4 szinttel feljebb), a
 `config.example.php` mintájára. Ide kerül az adatbázis és a belépés.
 
-### 3. Az első admin-felhasználó
+### 3. Belépés: Google-fiók és passkey
 
-1. Nyisd meg a `https://pepperadmin.zentopia.io/jelszo.php` oldalt. Amíg
-   nincs egyetlen felhasználó sem, belépés nélkül is elérhető.
-2. Add meg a felhasználónevet és egy legalább 12 karakteres jelszót. Az oldal
-   kiír egy sort, például: `'gergely' => '$2y$10$…',`
-3. Ezt a sort tedd a konfiguráció `admin_users` részébe.
+Jelszavas belépés nincs. A konfigurációban (`config.example.php` minta):
 
-Ettől kezdve a `jelszo.php` is csak belépve érhető el.
+```php
+'admin_users' => ['gergely' => 'valaki@gmail.com'],
+```
+
+**Google-belépés** (egyszer, kb. 5 perc):
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → új projekt
+   (pl. „Pepper Admin”).
+2. *APIs & Services → OAuth consent screen*: External, alkalmazásnév, a
+   saját e-mail-címed. Hatókör nem kell (csak `openid email`). Utána
+   *Publish app* – ehhez ennyi hatókörrel nem kell Google-ellenőrzés.
+3. *Credentials → Create credentials → OAuth client ID* → Web application.
+   *Authorized redirect URIs*: `https://pepperadmin.zentopia.io/google.php`
+4. A kapott Client ID és Client secret a konfiguráció `google` részébe kerül.
+   A secret csak a szerveren legyen, chatbe és gitbe ne.
+
+**Passkey:** belépés után a *Passkeyek* oldalon vehetsz fel egyet minden
+eszközödhöz (telefon, laptop). Érdemes legalább egyet felvenni, hogy a
+Google-belépés kiesése esetén is be tudj lépni.
+
+**Első passkey Google nélkül:** tegyél a konfigurációba egy legalább 20
+karakteres `setup_code`-ot, és a `/elso-passkey.php` oldalon a
+felhasználónévvel együtt add meg. Utána a sort töröld; amíg ott van, a
+kezdőoldal figyelmeztet.
 
 ### 4. Az aláíró kulcs – enélkül nincs távoli frissítés
 
@@ -81,8 +100,11 @@ nem, kiadás nem készül, és a hiba látszik az Action naplójában.
   - és hogy nem írja felül a `frissito.py`-t, a kulcsot vagy az ini-t.
 - **A tokenek** csak hash-ként vannak az adatbázisban. A jelentésben küldött
   helyszín-kulcsnak egyeznie kell a tokenével.
-- **Belépés:** biztonságos session-süti, CSRF-védelem, IP-nként legfeljebb 5
-  hibás próbálkozás 15 percenként, 8 óra tétlenség után kilépés.
+- **Belépés:** Google (OpenID Connect, PKCE, state és nonce) vagy passkey
+  (WebAuthn, mindig ujjlenyomat/arc/PIN-ellenőrzéssel, aláírás- és
+  számlálóellenőrzéssel). A passkeyekből a szerveren csak a nyilvános kulcs
+  van. Biztonságos session-süti, CSRF-védelem, IP-nként legfeljebb 5
+  sikertelen belépés 15 percenként, 8 óra tétlenség után kilépés.
 - **A webről nem érhető el:** a konfiguráció, a `lib/` és a `kiadasok/` mappa.
 - **A jelentésben nincs üzleti vagy személyes adat:** se név, se
   kártyakód, se egyenleg, se nyugta.
@@ -94,7 +116,10 @@ nem, kiadás nem készül, és a hiba látszik az Action naplójában.
 | `/` | belépés, majd a helyszínek áttekintése, új helyszín, frissítés mindenhol |
 | `/helyszin.php?id=…` | egy helyszín részletei, célverzió, token, nyers jelentés |
 | `/naplo.php` | eseménynapló |
-| `/jelszo.php` | jelszó-hash a konfigurációhoz |
+| `/passkey.php` | saját passkeyek: felvétel, törlés |
+| `/google.php` | Google-belépés (indulás és visszatérés) |
+| `/elso-passkey.php` | első passkey beállító kóddal (csak ha van `setup_code`) |
+| `/api/passkey.php` | passkey-műveletek az oldalak JavaScriptjének |
 | `/allapot.php`, `/health.php` | telepítési állapot (titok nélkül) |
 | `/api/jelentes.php` | a gépek percenkénti jelentése (token) |
 | `/api/frissites.php` | aláírt kiadás letöltése (token, csak kijelölt verzió) |

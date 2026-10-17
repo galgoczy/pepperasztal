@@ -24,11 +24,12 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   ini-be, `install_jelentes.bat`, újra az `install_backup.bat` (napközbeni
   mentés). Lépések: README, 7. pont.
 - **RSR bekötése tesztre:** README, 7. pont.
-- **Aláíró kulcs:** generálás, `AGENT_SIGNING_KEY` secret, publikus rész az
-  `agent/kiadas_kulcs.txt`-be (lásd `admin/README.md`). Addig a távoli
-  frissítés ki van kapcsolva – minden más működik.
-- **Első admin-felhasználó:** `/jelszo.php` → a konfiguráció
-  `admin_users` részébe.
+- **Admin-belépés:** `admin_users` → `'nev' => 'gmail-cím'`, Google OAuth
+  kliens a konfigurációba, utána passkey felvétele (`admin/README.md`, 3.
+  pont).
+- **`kiadas_kulcs.txt` a gépekre:** a kulcs kész, és a CI már aláírt kiadást
+  készít. A fájlt minden gépre egyszer kézzel kell felmásolni (a frissítés
+  sosem írja felül).
 
 ## Később
 
