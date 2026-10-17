@@ -23,6 +23,9 @@ LEPESEK (a POS gepen, rendszergazdakent):
     python setup_users.py terv        mit csinalna (semmit nem valtoztat)
     python setup_users.py letrehoz    felhasznalok + jogok + ellenorzes
     python setup_users.py ellenoriz   csak az ellenorzes, barmikor
+    python setup_users.py ellenoriz --triggerproba 610
+                                      + valodi, visszagorgetett UPDATE a
+                                        tesztkartyan (triggerek joga)
     python setup_users.py visszavon   minden jog vissza, felhasznalok torolve
 
 Barmelyik lepes ujrafuttathato: a letrehoz meglevo felhasznalonak csak a
@@ -58,11 +61,19 @@ VIP_UPDATE_COLS = ("AKT_KP", "LIMIT_KP", "AKT_FORG", "KARTYA")
 # maga nem tud a KARTYATULAJDONOS-ba irni, csak a NovoHost sajat
 # triggere, a kartya beszurasakor.
 #   (jog, objektum-tipus, objektum, kapo-tipus, kapo)
+#
+# Az eles felderites (Szentkiralyi, 2026-10-17) szerint:
+#   - a BU0 (modositas elott) is meghivja az NH$CHK_DBL_VIP_CARD-ot,
+#     tehat minden egyenleg-UPDATE-nel lefut;
+#   - a CHECK_54 ellenorzo trigger UPDATE utan a KARTYATULAJDONOS-t olvassa.
 OBJEKTUM_JOGOK = (
     ("INSERT", "", "KARTYATULAJDONOS", "TRIGGER", "KARTYATORZS_AI0"),
     ("EXECUTE", "PROCEDURE", "NH$CHK_DBL_VIP_CARD", "TRIGGER",
      "KARTYATORZS_BI0"),
+    ("EXECUTE", "PROCEDURE", "NH$CHK_DBL_VIP_CARD", "TRIGGER",
+     "KARTYATORZS_BU0"),
     ("SELECT", "", "KARTYATORZS", "PROCEDURE", "NH$CHK_DBL_VIP_CARD"),
+    ("SELECT", "", "KARTYATULAJDONOS", "TRIGGER", "CHECK_54"),
 )
 
 # RDB$USER_PRIVILEGES.RDB$USER_TYPE: 2 = trigger, 5 = eljaras
@@ -333,6 +344,8 @@ def _expect(cfg, key, sql, allowed, label):
     jog.
     """
     out, err = run_isql(cfg, sql, user_key=key)
+    err = "\n".join(l for l in err.splitlines()
+                    if "Rolling back work" not in l)
     denied = bool(re.search(r"no permission|-551", err, re.I))
     other = err.strip() and not denied
     if other:
@@ -403,8 +416,32 @@ def verify(cfg, kihagy=None):
     return ok
 
 
+def trigger_proba(cfg, kid):
+    """
+    Valodi UPDATE egy TESZTKARTYAN, ertekvaltozas nelkul, COMMIT nelkul.
+    A 0 soros probak (WHERE ID = -1) a triggereket nem futtatjak le; ez
+    igen (BU0, CHECK_54 ...). Ha egy triggernek hianyzik a joga, itt
+    derul ki, nem az elso eles feltoltesnel. A sort a futas idejere
+    zarolja (ezredmasodpercek), a QUIT visszagorgeti.
+    """
+    rows, err = q(cfg, "SELECT COUNT(*) AS N FROM KARTYATORZS WHERE ID = {0} "
+                  "AND NEV STARTING WITH 'Minta';".format(int(kid)), ["N"])
+    if not rows or rows[0].get("N") != "1":
+        log("   !! a(z) {0} nem tesztkartya (a neve nem 'Minta...') - a "
+            "probat nem futtatom.".format(kid))
+        return False
+    return _expect(cfg, "vip",
+                   "UPDATE KARTYATORZS SET AKT_KP = AKT_KP, LIMIT_KP = "
+                   "LIMIT_KP, AKT_FORG = AKT_FORG WHERE ID = {0};".format(
+                       int(kid)), True,
+                   "VIP    valodi UPDATE a {0}-es tesztkartyan, triggerekkel "
+                   "(visszagorgetve)".format(kid))
+
+
 def cmd_ellenoriz(cfg, args):
     ok = verify(cfg)
+    if args.triggerproba:
+        ok = trigger_proba(cfg, args.triggerproba) and ok
     log("Minden rendben." if ok else "VAN ELTERES - lasd fent.")
     sys.exit(0 if ok else 1)
 
@@ -466,6 +503,9 @@ def main():
                                       "letrehoz", "ellenoriz", "visszavon"])
     ap.add_argument("--igen", action="store_true",
                     help="visszavonas megerositese")
+    ap.add_argument("--triggerproba", type=int, metavar="KARTYA_ID",
+                    help="ellenoriz: valodi, visszagorgetett UPDATE ezen a "
+                         "tesztkartyan (a neve 'Minta'-val kell kezdodjon)")
     args = ap.parse_args()
     set_log(os.path.join(HERE, "setup_users_log.txt"))
     cfg = load_config()

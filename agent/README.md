@@ -13,6 +13,9 @@ Ez a 0. fázis: **mentés, korlátozott adatbázis-felhasználók és felderít�
 | `common.py` | közös isql/ini/DPAPI réteg | – |
 
 Python 3.4-től működik (XP-s gépek is), csak a standard könyvtárat használja.
+Az első éles felderítés (Szentkirályi) szerint a szerver **InterBase 7.5**
+(ODS 11.2, dialektus 3) – nem IB6, ahogy korábban feltételeztük. A
+scriptek mindkettőn működnek.
 Python adatbázis-driver **tilos**: a `firebirdsql` egyszer megfektette az éles
 szervert, ezért minden az `isql.exe`-n, `gbak.exe`-n, `gsec.exe`-n keresztül megy.
 
@@ -111,6 +114,17 @@ A kártyabeszúráskor lefutó NovoHost-triggerek a szükséges jogot
 Az ellenőrzés (`python setup_users.py ellenoriz`, bármikor futtatható)
 `WHERE ID = -1` feltételű utasításokkal próbálja ki, mit szabad és mit nem.
 Ezek egyetlen sort sem érintenek, nem zárolnak, és nincs utánuk commit.
+
+A 0 soros próba a **triggereket nem futtatja le**. Márpedig a NovoHost
+triggerei (`KARTYATORZS_BU0`, `CHECK_54`) minden egyenleg-módosításnál
+lefutnak, és nekik is kell jog. Ezt a valódi trigger-próba ellenőrzi:
+
+```
+python setup_users.py ellenoriz --triggerproba 610
+```
+
+Ez egy értékváltozás nélküli `UPDATE` a 610-es tesztkártyán (csak akkor
+fut, ha a kártya neve „Minta"-val kezdődik), commit nélkül, visszagörgetve.
 
 - **Mit véd:** a saját hibáinkat és egy feltört felhőt korlátozza. A
   legrosszabb eset „valaki egyenleget írt", nem „elveszett egy hónap forgalma".
