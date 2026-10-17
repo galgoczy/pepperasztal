@@ -2,14 +2,25 @@
 
 Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerülnek.
 
+## Kész – Szentkirályi (2026-10-17)
+
+- Mentés manifesttel: 157 MB → 80,7 MB gbk → 13,9 MB zip, 8 mp.
+- `PEPPER_OLVAS` és `PEPPER_VIP` létrehozva, 16/16 ellenőrzés zöld.
+- Valódi trigger-próba a 610-es tesztkártyán: a `CHECK_54` és a
+  `KARTYATORZS_BU0` jogai rendben, az egyenleg-`UPDATE` átmegy.
+- Felderítés `PEPPER_OLVAS`-ként lefutott. Megállapítások:
+  - Feltöltős kártyánál minden VIP-fizetéshez van `FK` naplósor pontosan
+    azonos összeggel → a költés-értesítés a `KARTYANAPLO`-ra épül.
+  - Napi egyeztetés: `AKT_KP` = utolsó naplósor `AKT + OSSZEG` (22/22).
+  - Részfizetés: VIP + készpénz előfordul (10 eset, mind feltöltős kártya).
+    Mínuszba soha nem ment egyetlen kártya sem.
+  - A `2`-es termékkódok 3–4 jegyűek, 13 jegyű kóddal nem ütköznek.
+  - A napi étlap nem a NovoHostban él.
+
 ## Folyamatban
 
-- **Korlátozott felhasználók – Szentkirályi.** `setup_users.py letrehoz`, majd
-  `ellenoriz --triggerproba 610`. Az első futás a `gsec` miatt megállt (semmi
-  nem változott), a javítás után újra kell futtatni.
-- **`CHECK_54` trigger-jog.** Nem biztos, hogy az InterBase enged jogot egy
-  ellenőrző triggernek. A `--triggerproba 610` dönti el; ha hibát ad, más
-  megoldás kell.
+- **A mentés ütemezett feladata:** ellenőrizni, hogy a `PepperHouse-Mentes`
+  fel van-e telepítve, és a „Next Run Time" nem N/A.
 
 ## Később
 
@@ -34,11 +45,20 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   a 610-es tesztkártyával. Tesztoldal kérésre készül.
 - **Az app vonalkód-képernyője:** fényerő maximumra, a képernyő ne aludjon
   el, fehér háttér. Ez natív appban megoldható, PWA-ban nem.
-- **Pontszabály a valódi kategóriákra** (`ETELTIP`): a menü- és
-  főétel-kategóriák listáját a Pepper House hagyja jóvá. A csomagolás és a
-  betétdíj nem kap pontot.
-- **`PEPPER_OLVAS` szűkítése** a most engedélyezett 172 tábláról arra a 6–8
-  táblára, amire az ügynöknek valóban szüksége van.
+- **Pontszabály a valódi kategóriákra** (`ETELTIP`, jóváhagyja a Pepper
+  House). Javaslat:
+  - 1 pont: Menü 1 (16), Menü 2 (17), Fitness menü (18)
+  - 2 pont: Főétel (9), Egytálétel (8), Wok (27), Rántott (29), Halak (31);
+    kérdéses: Főzelékek (6), Tészták (32), Napi frissen sültek (33)
+  - 0 pont: minden más, különösen a VIP Töltés (36), Kiszállítás (35),
+    Protokoll (24), Rendezvény (26), betétdíj, pohár, doboz
+- **`PEPPER_OLVAS` szűkítése – a felhős rész előtt kötelező.** Ma 172 táblát
+  lát, köztük személyes adatot is: `VEVOK`, `FOGLALAS`, `CIMEK`, `SZEMELYZET`,
+  `KEZELO`, `TULAJDONOS`, `UTCAJEGYZEK`. Az ügynöknek ennyi kell:
+  `KARTYATORZS`, `KARTYANAPLO`, `KARTYATIPUS`, `NYUGTAFEJ`, `NYUGTAFIZETES`,
+  `NYUGTATETEL`, `ETELFAJ`, `ETELTIP` (a felderítéshez még `CIKKEK`,
+  `GEPETLAP`, `ETLAPOK`, `KARTYAGYUJTO`). A `setup_users.py` tiltólista
+  helyett engedélylistát kapjon, és vegye vissza a többit.
 - **A NovoHost saját mentése** (`NH_AutoBackupService.exe`, `data\Backup`,
   utoljára 2025-09-06): mi van benne, fut-e még.
 - **Hostinger:** aldomain, PHP-verzió, üres MySQL-adatbázis külön
