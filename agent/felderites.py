@@ -509,7 +509,7 @@ def sec_minta(d, rep):
     Hogyan kapcsolodik egy VIP-fizetes a kartyanaplohoz? Minden kis ablakos
     VIP-fizeteshez keresunk ugyanannak a kartyanak +-15 percen beluli FK
     sorat, es megnezzuk, mihez egyezik az osszege. Kartyatipusonkent, mert
-    a szemelyzeti kartya (4) 0 Ft-ot fizet.
+    a szemelyzeti kartya 0 Ft-ot fizet.
     """
     rep.h("1b. VIP-FIZETES ES KARTYANAPLO OSSZEVETESE (kis ablak)")
     fk = _fk_by_card(d)
@@ -548,7 +548,7 @@ def sec_minta(d, rep):
         rep.text("{0:>5}  {1:>10}  {2:>12}  {3:>9}  {4:>11}  {5:>4}".format(
             tip, st["n"], st["ido"], st["forint"], st["vegertek"],
             st["nulla"]))
-    rep.text("(1 = Feltolto, 4 = Szemelyzet)")
+    rep.text("(1 = Feltolto; a szemelyzeti tipus helyszinenkent mas lehet, lasd 6. KARTYATIPUS)")
     t1 = stat.get("1")
     if t1 and t1["n"] and t1["forint"] >= 0.95 * t1["n"]:
         rep.verdict("Feltolto kartyanal minden VIP-fizeteshez van FK naplosor "
@@ -556,7 +556,7 @@ def sec_minta(d, rep):
                     "KARTYANAPLO figyelesere epulhet.")
     t4 = stat.get("4")
     if t4 and t4["n"] and not t4["ido"]:
-        rep.text("A szemelyzeti kartya (4) nem ir naplosort - a fogyasztasa "
+        rep.text("A szemelyzeti kartya nem ir naplosort - a fogyasztasa "
                  "az AKT_FORG-ban halmozodik.")
 
     rep.sub("Minta: legutobbi VIP-nyugtak tipusonkent (csak osszegek)")
@@ -872,7 +872,7 @@ def sec_kartyak(db, rep):
     if not rows and not nul:
         rep.verdict("Minden kartyan igaz - a napi egyeztetes erre epulhet.")
     else:
-        rep.verdict("Nem minden kartyan igaz. A szemelyzeti kartyaknal (4) ez "
+        rep.verdict("Nem minden kartyan igaz. A szemelyzeti kartyaknal ez "
                     "vart: a fogyasztasuk az AKT_FORG-ban halmozodik. A napi "
                     "egyeztetes az 5b szakasz szerinti szabalyra epuljon.")
 
@@ -1155,61 +1155,75 @@ KARTYAS_MEZO = re.compile(r"KART|KKOD|VEVO|TORZS|TAG|VIP|KEDV|ENGED|PONT")
 
 def sec_azonositas(db, rep, lo):
     """Rogziti-e a kassza a kartyat akkor is, ha nem azzal fizettek (csak
-    azonositas, kedvezmeny)? Csak darabszamok, kartyakod es nev nelkul."""
+    azonositas, kedvezmeny)? Csak darabszamok, kartyakod es nev nelkul.
+    A kassza kartya nelkul 0-t / ures szoveget ir a mezokbe, nem NULL-t."""
     rep.h("11. KARTYA A NYUGTAN FIZETES NELKUL?")
-    rep.text("Ablak: NYUGTAFEJ.ID > {0}".format(lo))
+    rep.text("Ablak: NYUGTAFEJ.ID > {0}. Kartya = KKODID > 0.".format(lo))
 
-    rep.sub("NYUGTAFIZETES sorok kartyahivatkozassal, fizetesi mod szerint")
-    rows, e = db.rows(
-        "SELECT N.FIZTIPID AS FID, N.FIZTIP AS FT, COUNT(*) AS DB, "
-        "SUM(N.FORINT) AS OSSZ FROM NYUGTAFIZETES N WHERE N.FEJ > {0} AND "
-        "N.KKODID IS NOT NULL GROUP BY N.FIZTIPID, N.FIZTIP;".format(lo),
-        ["FID", "FT", "DB", "OSSZ"])
-    rep.err(e)
-    rep.text("{0:>8} {1:>6} {2:>8} {3:>12}".format("FIZTIPID", "TIPUS", "SOR", "OSSZEG"))
-    for r in rows:
-        rep.text("{0:>8} {1:>6} {2:>8} {3:>12}".format(
-            r.get("FID"), (r.get("FT") or "").strip(), r.get("DB"),
-            fmt(_f(r.get("OSSZ")))))
-    # A parositas a memoriaban (korrelalt allekerdezes nelkul - lassu lenne).
+    tipus = dict((_i(r.get("ID")), _i(r.get("T"))) for r in db.rows(
+        "SELECT K.ID AS ID, K.TIPUS AS T FROM KARTYATORZS K;", ["ID", "T"])[0])
     sorok, e = db.rows(
-        "SELECT N.FEJ AS FEJ, N.FIZTIPID AS FID, N.FIZTIP AS FT FROM "
-        "NYUGTAFIZETES N WHERE N.FEJ > {0} AND N.KKODID IS NOT NULL;".format(lo),
-        ["FEJ", "FID", "FT"])
+        "SELECT N.FEJ AS FEJ, N.FIZTIPID AS FID, N.FIZTIP AS FT, N.KKODID AS K, "
+        "N.FORINT AS F FROM NYUGTAFIZETES N WHERE N.FEJ > {0} AND "
+        "N.KKODID > 0;".format(lo), ["FEJ", "FID", "FT", "K", "F"])
     rep.err(e)
+
+    rep.sub("Fizetesi sorok kartyaval (KKODID > 0): mod, kartyatipus")
+    csop = {}
+    for r in sorok:
+        k = (r.get("FID"), (r.get("FT") or "").strip(),
+             tipus.get(_i(r.get("K")), "?"))
+        db_, ossz = csop.get(k, (0, 0.0))
+        csop[k] = (db_ + 1, ossz + (_f(r.get("F")) or 0))
+    rep.text("{0:>8} {1:>6} {2:>6} {3:>8} {4:>12}".format(
+        "FIZTIPID", "TIPUS", "KARTYA", "SOR", "OSSZEG"))
+    for k in sorted(csop, key=lambda x: (str(x[0]), x[1], str(x[2]))):
+        rep.text("{0:>8} {1:>6} {2:>6} {3:>8} {4:>12}".format(
+            k[0], k[1], k[2], csop[k][0], fmt(csop[k][1])))
+    if not csop:
+        rep.text("nincs")
+
     vip_fej = set(_i(r.get("FEJ")) for r in sorok if r.get("FID") == "10")
     mas_fej = set(_i(r.get("FEJ")) for r in sorok if r.get("FID") != "10")
-    csak_fiz = set(_i(r.get("FEJ")) for r in sorok if r.get("FID") != "10"
-                   and (r.get("FT") or "").strip() == "FIZ") - vip_fej
     rep.kv("Nyugta VIP-fizetessel", len(vip_fej))
     rep.kv("Nyugta, ahol nem VIP soron is van kartya", len(mas_fej))
-    rep.kv("  ebbol VIP-fizetes NELKULI (csak azonositas?)", len(mas_fej - vip_fej))
-    rep.kv("  ebbol mas fizetesi sorral, VIP nelkul", len(csak_fiz))
+    csak = mas_fej - vip_fej
+    rep.kv("  ebbol VIP-fizetes NELKULI (csak azonositas?)", len(csak))
+    if csak:
+        t = {}
+        for r in sorok:
+            if _i(r.get("FEJ")) in csak:
+                kt = tipus.get(_i(r.get("K")), "?")
+                t[kt] = t.get(kt, 0) + 1
+        rep.kv("    kartyatipus szerint (sor)", ", ".join(
+            "tipus {0}: {1}".format(k, t[k]) for k in sorted(t, key=str)))
 
-    rep.sub("Kartyara utalo mezok a nyugta-tablakban")
+    rep.sub("Kartyara utalo mezok a nyugta-tablakban (nem 0 / nem ures)")
     rows, e = db.rows(
-        "SELECT RF.RDB$RELATION_NAME AS T, RF.RDB$FIELD_NAME AS M FROM "
-        "RDB$RELATION_FIELDS RF WHERE RF.RDB$RELATION_NAME IN ('NYUGTAFEJ', "
-        "'NYUGTATETEL', 'NYUGTAFIZETES') ORDER BY RF.RDB$RELATION_NAME, "
-        "RF.RDB$FIELD_POSITION;", ["T", "M"])
+        "SELECT RF.RDB$RELATION_NAME AS T, RF.RDB$FIELD_NAME AS M, "
+        "F.RDB$FIELD_TYPE AS FT FROM RDB$RELATION_FIELDS RF JOIN RDB$FIELDS F "
+        "ON F.RDB$FIELD_NAME = RF.RDB$FIELD_SOURCE WHERE RF.RDB$RELATION_NAME "
+        "IN ('NYUGTAFEJ', 'NYUGTATETEL', 'NYUGTAFIZETES') ORDER BY "
+        "RF.RDB$RELATION_NAME, RF.RDB$FIELD_POSITION;", ["T", "M", "FT"])
     rep.err(e)
-    mezok = {}
-    for r in rows:
-        mezok.setdefault((r.get("T") or "").strip(), []).append((r.get("M") or "").strip())
-    for t in sorted(mezok):
-        rep.text("{0}: {1}".format(t, ", ".join(mezok[t])))
     kulcs = {"NYUGTAFEJ": "ID", "NYUGTATETEL": "FEJ", "NYUGTAFIZETES": "FEJ"}
-    for t in sorted(mezok):
-        for m in mezok[t]:
-            if not IDENT.match(m) or not KARTYAS_MEZO.search(m) or m == "KKODID":
-                continue
-            n, e = db.num("SELECT COUNT(*) AS DB FROM {0} X WHERE X.{1} > {2} "
-                          "AND X.{3} IS NOT NULL;".format(t, kulcs[t], lo, m))
-            rep.kv("  {0}.{1} kitoltve".format(t, m), n if not e else "hiba")
-            rep.err(e)
-    rep.verdict("Ha a 'VIP-fizetes NELKULI' sor 0, es a fenti mezok uresek, "
-                "a kassza CSAK akkor koti a nyugtat a kartyahoz, ha azzal "
-                "fizettek. Mas eseten a kartya azonositasra is rogzul.")
+    szoveg = ("14", "37")
+    szam = ("7", "8", "10", "16", "27")
+    for r in rows:
+        t, m = (r.get("T") or "").strip(), (r.get("M") or "").strip()
+        ft = (r.get("FT") or "").strip()
+        if (t not in kulcs or not IDENT.match(m) or not KARTYAS_MEZO.search(m)
+                or m == "KKODID" or ft not in szoveg + szam):
+            continue
+        felt = "X.{0} <> ''".format(m) if ft in szoveg else "X.{0} <> 0".format(m)
+        n, e = db.num("SELECT COUNT(*) AS DB FROM {0} X WHERE X.{1} > {2} AND "
+                      "{3};".format(t, kulcs[t], lo, felt))
+        rep.kv("  {0}.{1}".format(t, m), n if not e else "hiba")
+        rep.err(e)
+    rep.verdict("Ha a 'VIP-fizetes NELKULI' sor 0, a kassza CSAK akkor koti a "
+                "nyugtat a kartyahoz, ha azzal fizettek. Ha nem 0, a kartya "
+                "azonositasra (pl. kedvezmeny) is rogzul - a kartyatipusbol "
+                "latszik, kie.")
 
 
 # ===========================================================================
