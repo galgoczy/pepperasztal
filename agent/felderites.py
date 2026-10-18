@@ -18,6 +18,7 @@ A VIP-app tervezese elott ezekre a kerdesekre kell valasz:
      port kifele nyitva van-e, van-e nyoma mentesnek.
   10. Van-e azonos nevu kartya (pl. szemelyzeti + feltoltos)?
   11. Mit ellenoriznek a kartya-triggerek es az NH$CHK_DBL_VIP_CARD?
+  12. Rogziti-e a kassza a kartyat fizetes nelkul (csak azonositas)?
 
 BIZTONSAG
   * A script minden utasitast ellenoriz: csak SELECT / SET LIST / SHOW
@@ -1149,6 +1150,68 @@ def sec_forras(db, rep):
             rep.err(err)
 
 
+KARTYAS_MEZO = re.compile(r"KART|KKOD|VEVO|TORZS|TAG|VIP|KEDV|ENGED|PONT")
+
+
+def sec_azonositas(db, rep, lo):
+    """Rogziti-e a kassza a kartyat akkor is, ha nem azzal fizettek (csak
+    azonositas, kedvezmeny)? Csak darabszamok, kartyakod es nev nelkul."""
+    rep.h("11. KARTYA A NYUGTAN FIZETES NELKUL?")
+    rep.text("Ablak: NYUGTAFEJ.ID > {0}".format(lo))
+
+    rep.sub("NYUGTAFIZETES sorok kartyahivatkozassal, fizetesi mod szerint")
+    rows, e = db.rows(
+        "SELECT N.FIZTIPID AS FID, N.FIZTIP AS FT, COUNT(*) AS DB, "
+        "SUM(N.FORINT) AS OSSZ FROM NYUGTAFIZETES N WHERE N.FEJ > {0} AND "
+        "N.KKODID IS NOT NULL GROUP BY N.FIZTIPID, N.FIZTIP;".format(lo),
+        ["FID", "FT", "DB", "OSSZ"])
+    rep.err(e)
+    rep.text("{0:>8} {1:>6} {2:>8} {3:>12}".format("FIZTIPID", "TIPUS", "SOR", "OSSZEG"))
+    for r in rows:
+        rep.text("{0:>8} {1:>6} {2:>8} {3:>12}".format(
+            r.get("FID"), (r.get("FT") or "").strip(), r.get("DB"),
+            fmt(_f(r.get("OSSZ")))))
+    # A parositas a memoriaban (korrelalt allekerdezes nelkul - lassu lenne).
+    sorok, e = db.rows(
+        "SELECT N.FEJ AS FEJ, N.FIZTIPID AS FID, N.FIZTIP AS FT FROM "
+        "NYUGTAFIZETES N WHERE N.FEJ > {0} AND N.KKODID IS NOT NULL;".format(lo),
+        ["FEJ", "FID", "FT"])
+    rep.err(e)
+    vip_fej = set(_i(r.get("FEJ")) for r in sorok if r.get("FID") == "10")
+    mas_fej = set(_i(r.get("FEJ")) for r in sorok if r.get("FID") != "10")
+    csak_fiz = set(_i(r.get("FEJ")) for r in sorok if r.get("FID") != "10"
+                   and (r.get("FT") or "").strip() == "FIZ") - vip_fej
+    rep.kv("Nyugta VIP-fizetessel", len(vip_fej))
+    rep.kv("Nyugta, ahol nem VIP soron is van kartya", len(mas_fej))
+    rep.kv("  ebbol VIP-fizetes NELKULI (csak azonositas?)", len(mas_fej - vip_fej))
+    rep.kv("  ebbol mas fizetesi sorral, VIP nelkul", len(csak_fiz))
+
+    rep.sub("Kartyara utalo mezok a nyugta-tablakban")
+    rows, e = db.rows(
+        "SELECT RF.RDB$RELATION_NAME AS T, RF.RDB$FIELD_NAME AS M FROM "
+        "RDB$RELATION_FIELDS RF WHERE RF.RDB$RELATION_NAME IN ('NYUGTAFEJ', "
+        "'NYUGTATETEL', 'NYUGTAFIZETES') ORDER BY RF.RDB$RELATION_NAME, "
+        "RF.RDB$FIELD_POSITION;", ["T", "M"])
+    rep.err(e)
+    mezok = {}
+    for r in rows:
+        mezok.setdefault((r.get("T") or "").strip(), []).append((r.get("M") or "").strip())
+    for t in sorted(mezok):
+        rep.text("{0}: {1}".format(t, ", ".join(mezok[t])))
+    kulcs = {"NYUGTAFEJ": "ID", "NYUGTATETEL": "FEJ", "NYUGTAFIZETES": "FEJ"}
+    for t in sorted(mezok):
+        for m in mezok[t]:
+            if not IDENT.match(m) or not KARTYAS_MEZO.search(m) or m == "KKODID":
+                continue
+            n, e = db.num("SELECT COUNT(*) AS DB FROM {0} X WHERE X.{1} > {2} "
+                          "AND X.{3} IS NOT NULL;".format(t, kulcs[t], lo, m))
+            rep.kv("  {0}.{1} kitoltve".format(t, m), n if not e else "hiba")
+            rep.err(e)
+    rep.verdict("Ha a 'VIP-fizetes NELKULI' sor 0, es a fenti mezok uresek, "
+                "a kassza CSAK akkor koti a nyugtat a kartyahoz, ha azzal "
+                "fizettek. Mas eseten a kartya azonositasra is rogzul.")
+
+
 # ===========================================================================
 
 def main():
@@ -1216,6 +1279,9 @@ def main():
     sec_nevek(db, rep, d["kartyak"] if mx is not None else None)
     db.progress("-- 10. forrasok")
     sec_forras(db, rep)
+    if mx is not None:
+        db.progress("-- 11. azonositas")
+        sec_azonositas(db, rep, lo_kicsi)
     db.progress("-- kesz")
 
     if db.errors:

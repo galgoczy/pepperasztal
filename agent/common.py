@@ -26,7 +26,7 @@ import time
 
 # Minden kiadasnal noveld - a scriptek indulaskor kiirjak, igy egy
 # hibajelentesbol azonnal latszik, melyik verzio fut a gepen.
-AGENT_VERSION = "2026-10-18.1"
+AGENT_VERSION = "2026-10-19.1"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INI_PATH = os.path.join(HERE, "pepper_agent.ini")
