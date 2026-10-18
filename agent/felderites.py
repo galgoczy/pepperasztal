@@ -1220,6 +1220,20 @@ def sec_azonositas(db, rep, lo):
                       "{3};".format(t, kulcs[t], lo, felt))
         rep.kv("  {0}.{1}".format(t, m), n if not e else "hiba")
         rep.err(e)
+        if not n or e:
+            continue
+        # Mit tartalmaz? Szamnal az ertekek eloszlasa (ha keves fele van),
+        # szovegnel csak a kulonbozo ertekek szama - tartalom nem.
+        kul, _ = db.num("SELECT COUNT(DISTINCT X.{0}) AS DB FROM {1} X WHERE "
+                        "X.{2} > {3} AND {4};".format(m, t, kulcs[t], lo, felt))
+        rep.kv("    kulonbozo ertek", kul)
+        if ft in szam and kul is not None and kul <= 30:
+            ert, _ = db.rows("SELECT X.{0} AS V, COUNT(*) AS DB FROM {1} X WHERE "
+                             "X.{2} > {3} AND {4} GROUP BY X.{0};".format(
+                                 m, t, kulcs[t], lo, felt), ["V", "DB"])
+            ert.sort(key=lambda r: -(_i(r.get("DB")) or 0))
+            rep.kv("    ertekek (ertek: db)", ", ".join(
+                "{0}: {1}".format(r.get("V"), r.get("DB")) for r in ert[:10]))
     rep.verdict("Ha a 'VIP-fizetes NELKULI' sor 0, a kassza CSAK akkor koti a "
                 "nyugtat a kartyahoz, ha azzal fizettek. Ha nem 0, a kartya "
                 "azonositasra (pl. kedvezmeny) is rogzul - a kartyatipusbol "
