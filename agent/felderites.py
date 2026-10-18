@@ -1150,7 +1150,7 @@ def sec_forras(db, rep):
             rep.err(err)
 
 
-KARTYAS_MEZO = re.compile(r"KART|KKOD|VEVO|TORZS|TAG|VIP|KEDV|ENGED|PONT")
+KARTYAS_MEZO = re.compile(r"KART|KKOD|VEVO|VENDEG|FIZETO|CIMID|TORZS|TAG|VIP|KEDV|ENGED|PONT")
 
 
 def sec_azonositas(db, rep, lo):
