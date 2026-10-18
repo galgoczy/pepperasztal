@@ -15,9 +15,10 @@
 ; =====================================================================
 
 [general]
-; A helyszin kulcsa, ekezet es szokoz nelkul, ugyanaz, mint a forgalmi sync
-; live_sync.ini-jeben (pl. Szentkiralyi, Knorr105). Fajlnevekben is ez latszik.
-helyszin = Szentkiralyi
+; A helyszin kulcsa, ekezet es szokoz nelkul - PONTOSAN az, amit az adminban
+; az "Uj helyszin"-nel megadtal (pl. Szentkiralyi, Allamkincstar). A token
+; csak ehhez a kulcshoz ervenyes. Fajlnevekben is ez latszik.
+helyszin =
 
 [interbase]
 ; Csak akkor kell, ha nem az alapertelmezett helyen van.
