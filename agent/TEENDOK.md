@@ -54,6 +54,9 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 - **További helyszínek: RSR és TTK** (itt lehet tesztelni). Félretéve, amíg
   Szentkirályi stabil. Lépések: README, 7. pont.
 
+- **A meglévő kártyák mágneskártyák** (a `;…?` kódforma a mágnescsík
+  2. sávja). Vonalkódos egyelőre csak a 610-es tesztkártya lesz, ezért a
+  kártyakódokat nem kérjük le a felhőbe.
 - **Vonalkód-teszt a régi USB-s olvasóval.** Telefon maximális fényerőn,
   először Jegyzettömbbe olvasva: beolvassa-e a kijelzőt, és helyesen
   érkeznek-e a `;` és `?` karakterek. Utána a NovoHost VIP-kártyás ablakában
