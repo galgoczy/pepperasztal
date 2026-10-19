@@ -1,6 +1,7 @@
 /*
  * Vonalkod-teszt: Code 128 (B keszlet) SVG-ben, telefon kijelzojere.
- * A kod csak a bongeszoben el, a szerverre nem megy fel.
+ * A kezzel beirt kod csak a bongeszoben el; a szerverrol jott kodot
+ * (data-szerver) nem mentjuk el a telefonon.
  */
 (function () {
   'use strict';
@@ -63,7 +64,9 @@
 
   function rajzol() {
     var s = be.value.trim();
-    try { localStorage.setItem('vonalkod', s); } catch (e) {}
+    if (!szerver) {
+      try { localStorage.setItem('vonalkod', s); } catch (e) {}
+    }
     hely.textContent = '';
     if (!s) return;
     valtozatok(s).forEach(function (t) {
@@ -82,8 +85,11 @@
     });
   }
 
-  try { be.value = localStorage.getItem('vonalkod') || ''; } catch (e) {}
-  be.addEventListener('input', rajzol);
+  var szerver = be.hasAttribute('data-szerver');
+  if (!szerver) {
+    try { be.value = localStorage.getItem('vonalkod') || ''; } catch (e) {}
+  }
+  be.addEventListener('input', function () { szerver = false; rajzol(); });
   rajzol();
 
   // A kepernyo ne aludjon el, amig az oldal latszik (ahol a bongeszo tamogatja).

@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-const PA_SCHEMA_VERSION = 6;
+const PA_SCHEMA_VERSION = 7;
 
 function pa_is_sqlite(): bool
 {
@@ -126,6 +126,12 @@ function pa_migrate(): void
     // 4: a kartya neve titkositva (lib/titok.php)
     try {
         $db->exec('ALTER TABLE kartya ADD COLUMN nev_titkos TEXT NULL');
+    } catch (Throwable $e) {
+        // mar letezik
+    }
+    // 7: a kartyakod (KARTYA) titkositva, a vonalkod-oldalhoz
+    try {
+        $db->exec('ALTER TABLE kartya ADD COLUMN kod_titkos TEXT NULL');
     } catch (Throwable $e) {
         // mar letezik
     }

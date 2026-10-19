@@ -54,13 +54,15 @@ url = https://pepperadmin.zentopia.io
 token =
 
 [kartyak]
-; Feltoltos kartyak mozgasai, egyenlegei es neve a Pepper Adminnak
-; (kartyakod nelkul; a nevet a szerver titkositva tarolja).
+; Feltoltos kartyak mozgasai, egyenlegei, neve es kodja a Pepper Adminnak
+; (a nevet es a kodot a szerver titkositva tarolja).
 ; kuldes = nem -> semmi nem megy fel; nevek = nem -> a nevek nem mennek fel,
-; es a szerver a mar tarolt neveket is torli.
+; es a szerver a mar tarolt neveket is torli; kodok = nem -> ugyanez a
+; kartyakodokkal (a vonalkod-oldalhoz kellenek).
 ; kezdet: ettol a KARTYANAPLO.ID-tol kuld (0 = a teljes elozmeny).
 kuldes = igen
 nevek = igen
+kodok = igen
 kezdet = 0
 
 [gyors]

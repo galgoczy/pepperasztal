@@ -3,7 +3,9 @@
  * Feltoltos kartyak: a gepek jelentesenek "kartyak" resze (agent/kartyak.py).
  *
  *   naplo:       { tol, ig, sorok: [{id, kartya, tipus, osszeg, elotte, ido}] }
- *   pillanatkep: { ido, gen, nevek, lista: [{id, egyenleg, ervenyes, nev?}] }
+ *   pillanatkep: { ido, gen, nevek, kodok, lista: [{id, egyenleg, ervenyes, nev?, kod?}] }
+ *                (a kod a kartyakod, a vonalkod-oldalhoz; titkositva, kodok = false
+ *                eseten a tarolt kodok torlodnek)
  *                (a nev titkositva kerul az adatbazisba; nevek = false eseten
  *                a helyszin minden tarolt nevet toroljuk)
  *   egyeztetes:  { ido, kartyak, naplo_nelkul, elteres: [...] }
@@ -106,12 +108,17 @@ function pa_kartyak_fogad(int $hid, array $k): array
         $ido = pa_ido_ok($p['ido'] ?? '') ?? pa_now();
         $gen = isset($p['gen']) ? (int)$p['gen'] : null;
         $nevek = ($p['nevek'] ?? false) === true;
+        $kodok = ($p['kodok'] ?? false) === true;
         $kulcs = pa_adat_kulcs() !== null;
         $db->beginTransaction();
         try {
             if (!$nevek) {
                 $db->prepare('UPDATE kartya SET nev_titkos = NULL WHERE helyszin_id = ?')->execute([$hid]);
             }
+            if (!$kodok) {
+                $db->prepare('UPDATE kartya SET kod_titkos = NULL WHERE helyszin_id = ?')->execute([$hid]);
+            }
+            $kodup = $db->prepare('UPDATE kartya SET kod_titkos = ? WHERE helyszin_id = ? AND kartya_id = ?');
             $up = $db->prepare('UPDATE kartya SET egyenleg = ?, egyenleg_ido = ?, egyenleg_gen = ?, ervenyes = ?
                                 WHERE helyszin_id = ? AND kartya_id = ?');
             $ins = $db->prepare('INSERT INTO kartya (egyenleg, egyenleg_ido, egyenleg_gen, ervenyes, helyszin_id, kartya_id)
@@ -131,6 +138,11 @@ function pa_kartyak_fogad(int $hid, array $k): array
                     $nev = mb_substr(trim($r['nev']), 0, 40);
                     $nevup->execute([$nev === '' ? null : pa_titkosit($nev, pa_nev_cel($hid, $kid)), $hid, $kid]);
                 }
+                if ($kodok && $kulcs) {
+                    $kod = $r['kod'] ?? null;
+                    $kod = is_string($kod) && preg_match('/^[\x20-\x7e]{1,20}$/', $kod) ? $kod : null;
+                    $kodup->execute([$kod === null ? null : pa_titkosit($kod, pa_kod_cel($hid, $kid)), $hid, $kid]);
+                }
             }
             $db->commit();
         } catch (Throwable $e) {
@@ -139,6 +151,7 @@ function pa_kartyak_fogad(int $hid, array $k): array
         }
         $info['pillanatkep'] = $ido;
         $info['nevek'] = $nevek ? ($kulcs ? 'titkositva' : 'nincs adat_kulcs') : 'kikapcsolva';
+        $info['kodok'] = $kodok ? ($kulcs ? 'titkositva' : 'nincs adat_kulcs') : 'kikapcsolva';
         $info['kartyak'] = count($lista);
         $ki['pillanatkep_ok'] = true;
     }
@@ -215,6 +228,12 @@ function pa_kartya_allapot(array $k, int $beerkezett_ig): string
 function pa_nev_cel(int $hid, int $kid): string
 {
     return 'kartya-nev:' . $hid . ':' . $kid;
+}
+
+/** A kartyakod titkositasanak kotott adata (mas kartya soraba masolva nem fejtheto vissza). */
+function pa_kod_cel(int $hid, int $kid): string
+{
+    return 'kartya-kod:' . $hid . ':' . $kid;
 }
 
 // ---- nevek megjelenitese az adminban -------------------------------------

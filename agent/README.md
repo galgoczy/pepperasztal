@@ -202,8 +202,9 @@ A `jelentes.py` percenként elküldi a mentés állapotát, egy adatbázis-prób
 
 A feltöltős kártyák neve is felmegy (a szerver titkosítva tárolja, az
 adminban alapból csillagozva látszik); kikapcsolás: `[kartyak]` →
-`nevek = nem`. Kártyakód, tulajdonos-adat, nyugta és személyzeti kártya nem
-megy fel. A
+`nevek = nem`. A kártyakód is felmegy, szintén titkosítva, hogy az admin
+vonalkódot tudjon belőle rajzolni; kikapcsolás: `kodok = nem`.
+Tulajdonos-adat, nyugta és személyzeti kártya nem megy fel. A
 gép csak akkor lép tovább a naplóban, ha a szerver visszaigazolta az
 adatot, ezért szakadás után sem marad ki és nem duplázódik semmi.
 Kikapcsolás: az ini-ben `[kartyak]` → `kuldes = nem`.

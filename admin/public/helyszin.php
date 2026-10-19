@@ -213,7 +213,8 @@ A kulcs csak a szerveren legyen; ha elveszik, a gépek a neveket újra felküldi
 <th>Utolsó mozgás</th><th class="num">Mozgások</th></tr>
 <?php foreach ($kartyak as $k): $all = pa_kartya_allapot($k, $ig); ?>
 <tr<?= (int)$k['ervenyes'] === 0 && $k['ervenyes'] !== null ? ' class="muted"' : '' ?>>
-  <td class="mono"><?= (int)$k['kartya_id'] ?></td>
+  <td class="mono"><?= (int)$k['kartya_id'] ?><?= ($k['kod_titkos'] ?? null) !== null
+      ? ' <a href="/vonalkod.php?k=' . $id . ':' . (int)$k['kartya_id'] . '" title="Vonalkód">▮▯▮</a>' : '' ?></td>
   <?php if ($van_nev): ?><td><?= h(pa_nev_mutat($k['nev_titkos'], $id, (int)$k['kartya_id'], $nmod)) ?></td><?php endif; ?>
   <td class="num"><?= $k['egyenleg'] !== null ? h(number_format((float)$k['egyenleg'], 0, ',', ' ')) : '–' ?></td>
   <td class="num"><?= $k['naplo_egyenleg'] !== null ? h(number_format((float)$k['naplo_egyenleg'], 0, ',', ' ')) : '–' ?></td>

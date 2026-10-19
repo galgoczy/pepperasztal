@@ -17,12 +17,13 @@ Mit kuld:
 A feltoltos kartyak neve a pillanatkeppel megy fel (a szerver titkositva
 tarolja, az adminban alapbol csillagozva latszik). Kikapcsolhato:
 [kartyak] nevek = nem - ekkor a szerver a mar tarolt neveket is torli.
+Ugyanigy a kartyakod (KARTYA, a vonalkodhoz): [kartyak] kodok = nem.
 
   - vasarlasok: a friss (3 napon beluli) koltesekhez a nyugta tetelei
     (termeknev, mennyiseg, ertek, kategoria). Parositas: kartya + osszeg +
     a nyugta lezarasa +-15 percen belul. Csak feltoltos kartyas fizetes.
 
-Amit NEM kuld: kartyakodot, tulajdonos-adatot, szemelyzeti kartyat.
+Amit NEM kuld: tulajdonos-adatot, szemelyzeti kartyat.
 
 Kurzor: a gep csak akkor lep tovabb, ha a szerver visszaigazolta, hogy
 megkapta (naplo_ig). Minden lekeresnel az utolso 20 ID-t ujra kuldi: a
@@ -91,10 +92,11 @@ def naplo_sorok(cfg, tol, ig):
              "ido": _ido(r.get("D"))} for r in rows if r.get("ID")]
 
 
-def egyenlegek(cfg, nevek=False):
+def egyenlegek(cfg, nevek=False, kodok=False):
     rows = _rows(cfg, "SELECT K.ID AS ID, K.AKT_KP AS E, K.ERVENYES AS V, "
-                      "K.NEV AS N FROM KARTYATORZS K WHERE K.TIPUS = 1;",
-                 ["ID", "E", "V", "N"])
+                      "K.NEV AS N" + (", K.KARTYA AS C" if kodok else "") +
+                      " FROM KARTYATORZS K WHERE K.TIPUS = 1;",
+                 ["ID", "E", "V", "N", "C"])
     ki = []
     for r in rows:
         if not r.get("ID"):
@@ -103,6 +105,10 @@ def egyenlegek(cfg, nevek=False):
              "ervenyes": 1 if (r.get("V") or "").strip() == "1" else 0}
         if nevek:
             d["nev"] = " ".join((r.get("N") or "").split())[:40]
+        if kodok:
+            kod = (r.get("C") or "").strip()
+            if kod and len(kod) <= 20:
+                d["kod"] = kod
         ki.append(d)
     return ki
 
@@ -288,12 +294,14 @@ def gyujt(cfg, naplo_gen):
                     del st["vas_var"][str(nid)]
         _ment(st)
 
+    kodok = bool(cfg.kartyak["kodok"])
     if (st.get("pillanat_gen") != naplo_gen
+            or st.get("pillanat_kodok") != kodok
             or most - st.get("pillanat_ido", 0) > PILLANAT_PERC * 60):
         nevek = bool(cfg.kartyak["nevek"])
         ki["pillanatkep"] = {"ido": time.strftime("%Y-%m-%d %H:%M:%S"),
-                             "gen": naplo_gen, "nevek": nevek,
-                             "lista": egyenlegek(cfg, nevek)}
+                             "gen": naplo_gen, "nevek": nevek, "kodok": kodok,
+                             "lista": egyenlegek(cfg, nevek, kodok)}
 
     nap = time.strftime("%Y-%m-%d")
     if (st.get("egyeztetes_nap") != nap
@@ -316,6 +324,7 @@ def nyugtaz(ki, resp):
     if p is not None and resp.get("pillanatkep_ok"):
         st["pillanat_gen"] = p["gen"]
         st["pillanat_ido"] = time.time()
+        st["pillanat_kodok"] = p.get("kodok", False)
     if ki.get("egyeztetes") is not None and resp.get("egyeztetes_ok"):
         st["egyeztetes_nap"] = ki["egyeztetes"]["ido"][:10]
     ok = set(resp.get("vasarlas_ok") or [])

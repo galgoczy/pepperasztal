@@ -26,7 +26,7 @@ import time
 
 # Minden kiadasnal noveld - a scriptek indulaskor kiirjak, igy egy
 # hibajelentesbol azonnal latszik, melyik verzio fut a gepen.
-AGENT_VERSION = "2026-10-19.8"
+AGENT_VERSION = "2026-10-19.9"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INI_PATH = os.path.join(HERE, "pepper_agent.ini")
@@ -76,7 +76,8 @@ class Config(object):
         self.felho = {"url": "", "token": None}
         # Feltoltos kartyak mozgasai a felhobe (kartyak.py). kezdet: ettol a
         # KARTYANAPLO.ID-tol kuld eloszor (0 = a teljes elozmeny).
-        self.kartyak = {"kuldes": True, "kezdet": 0, "lap": 300, "nevek": True}
+        self.kartyak = {"kuldes": True, "kezdet": 0, "lap": 300, "nevek": True,
+                        "kodok": True}
         # Gyakori ellenorzes nyitvatartasban: a percenkenti feladat ennyi
         # masodpercenkent nez ra a kartyanaplora, mielott kilep (tol-ig ora).
         self.gyors = {"be": True, "tol": 6, "ig": 21, "utem": 5}
@@ -165,6 +166,8 @@ def load_config(path=INI_PATH):
         k["kuldes"] = cfg.get("kartyak", "kuldes", fallback="igen").strip().lower() \
             not in ("nem", "no", "false", "0", "off", "ki")
         k["nevek"] = cfg.get("kartyak", "nevek", fallback="igen").strip().lower() \
+            not in ("nem", "no", "false", "0", "off", "ki")
+        k["kodok"] = cfg.get("kartyak", "kodok", fallback="igen").strip().lower() \
             not in ("nem", "no", "false", "0", "off", "ki")
         k["kezdet"] = cfg.getint("kartyak", "kezdet", fallback=0)
         k["lap"] = max(10, min(1000, cfg.getint("kartyak", "lap", fallback=300)))
