@@ -120,6 +120,8 @@ pa_show_flash();
   memória <?= h((string)($g['sajat_mem_mb'] ?? '–')) ?> MB
   <?php if (isset($g['ib_cpu'])): ?> · InterBase: memória <?= h((string)($g['ib_mem_mb'] ?? '–')) ?> MB<?php endif; ?>
   · <?= h((string)($g['ido'] ?? '')) ?></span>
+  <?php if (!empty($g['top'])): ?><br><span class="small">Legtöbb CPU az elmúlt percben:
+    <?= h(implode(', ', array_map(function ($t) { return $t[0] . ' ' . $t[1] . '%'; }, $g['top']))) ?></span><?php endif; ?>
 <?php elseif ($g): ?><span class="bad"><?= h((string)$g['hiba']) ?></span>
 <?php else: ?><span class="muted">nincs adat (ügynök 2026-10-19.5 vagy újabb kell)</span><?php endif; ?></td></tr>
 <tr><th>Adatbázis</th><td><?= !empty($a['db']['ok']) ? '<span class="ok">elérhető</span>' : '<span class="bad">' . h($a['db']['hiba'] ?? 'nincs adat') . '</span>' ?></td></tr>

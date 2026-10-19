@@ -9,6 +9,8 @@ Egy futas (a percenkenti feladat) elejen es vegen mintat vesz:
     masodpercben, es ugyanez az egesz gep (minden mag) egy percere vetitve;
     a Python memoriaja (munkakeszlet, csucs)
   - InterBase: az ibserver.exe CPU-ja es memoriaja ugyanebben az idoben
+  - a legtobb CPU-t vivo folyamatok neve es szazaleka az elmult percben
+    (csak a fajlnev, pl. NovoHost.exe, MsMpEng.exe - mas adat nem)
 
 Kulso csomag nincs (ctypes). Mas rendszeren minden ertek None.
 """
@@ -130,13 +132,42 @@ def _ib_folyamatok():
     return ki
 
 
+def _osszes_folyamat():
+    """{pid: [nev, cpu_mp]} minden folyamatra, amit meg tudunk nyitni
+    (SYSTEM-kent szinte mindet). Csak a futtathato fajl neve, mas nem."""
+    ki = {}
+    snap = _k32.CreateToolhelp32Snapshot(0x2, 0)
+    if not snap or snap == wintypes.HANDLE(-1).value:
+        return ki
+    try:
+        pe = _PE()
+        pe.dwSize = ctypes.sizeof(_PE)
+        ok = _k32.Process32FirstW(snap, ctypes.byref(pe))
+        while ok:
+            pid = pe.th32ProcessID
+            if pid:
+                h = _k32.OpenProcess(0x1000, False, pid)
+                if h:
+                    try:
+                        cpu = _proc_cpu(h)
+                        if cpu is not None:
+                            ki[str(pid)] = [pe.szExeFile[:60], round(cpu, 2)]
+                    finally:
+                        _k32.CloseHandle(h)
+            ok = _k32.Process32NextW(snap, ctypes.byref(pe))
+    finally:
+        _k32.CloseHandle(snap)
+    return ki
+
+
 def _minta():
     if not WIN:
         return None
     try:
         return {"t": time.time(), "rendszer": _rendszer(),
                 "sajat": _proc_cpu(_k32.GetCurrentProcess()),
-                "gyerek": GYEREK_CPU[0], "ib": _ib_folyamatok()}
+                "gyerek": GYEREK_CPU[0], "ib": _ib_folyamatok(),
+                "proc": _osszes_folyamat()}
     except Exception:
         return None
 
@@ -202,8 +233,22 @@ class Meres(object):
             if v["ib"]:
                 ki["ib_cpu"] = round(100.0 * ib_cpu / (ido * ncpu), 2)
                 ki["ib_mem_mb"] = round(ib_mem, 1)
+            # A legtobb CPU-t vivo folyamatok az elozo futas vege ota (kb. 1
+            # perc): nev es szazalek az egesz gepbol. A rovid eletu, kozben
+            # indult-leallt folyamatok kimaradnak.
+            if el.get("proc") and el.get("t") and 0 < v["t"] - el["t"] < 300:
+                per = (v["t"] - el["t"]) * ncpu
+                elott = el["proc"]
+                csop = {}
+                for pid, (nev, cpu) in v["proc"].items():
+                    regi = elott.get(pid)
+                    if regi and regi[0] == nev and cpu >= regi[1]:
+                        csop[nev] = csop.get(nev, 0.0) + cpu - regi[1]
+                top = sorted(csop.items(), key=lambda x: -x[1])[:6]
+                ki["top"] = [[n, round(100.0 * c / per, 1)] for n, c in top
+                             if 100.0 * c / per >= 0.2]
             ki["ido"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            ki["nyers"] = {"t": v["t"], "rendszer": v["rendszer"]}
+            ki["nyers"] = {"t": v["t"], "rendszer": v["rendszer"], "proc": v["proc"]}
             return ki
         except Exception as ex:
             return {"hiba": str(ex)[:160]}
