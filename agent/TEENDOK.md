@@ -27,6 +27,10 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   (610). Éles használat előtt: aláírt utasítás (a kulcs ne a szerveren
   legyen), és kétlépcsős azonosítás a Google-, Hostinger- és GitHub-fiókon.
 - **Tesztfelhasználó felvétele az adminból:** félretéve.
+- **Gyorsabb utasítás-átvétel (élesítés előtt):** most az utasítás a
+  percenkénti életjel válaszában megy le, ezért legfeljebb kb. 1 percet vár.
+  Terv: a gyors figyelés nyitvatartásban 10 másodpercenként kérdezze meg a
+  szervert, van-e utasítás. Csak ott, ahol `[iras] be = igen`.
 - **A novohost-cloud `python/vip_test_write.py` nyílt SYSDBA-jelszót
   tartalmaz** – onnan törölni (a git-előzményben megmarad).
 
