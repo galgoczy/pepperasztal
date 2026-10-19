@@ -102,7 +102,10 @@ try {
 
     $ver = substr((string)($in['agent_verzio'] ?? ''), 0, 32);
     $adat = $kinfo === null ? $raw : json_encode($in, JSON_UNESCAPED_UNICODE);
-    $row = [pa_now(), pa_client_ip_api(), substr((string)($in['gep'] ?? ''), 0, 100),
+    // "gep" a gep neve; a 2026-10-19.5-os ugynok tevedesbol a terhelest
+    // kuldte ezen a kulcson - azt nem irjuk a gepnev helyere.
+    $gepnev = is_string($in['gep'] ?? null) ? $in['gep'] : '';
+    $row = [pa_now(), pa_client_ip_api(), substr($gepnev, 0, 100),
             $ver, $adat, (int)$site['id']];
     $upd = $db->prepare('UPDATE jelentes SET ido = ?, ip = ?, gep = ?, agent_verzio = ?, adat = ?
                          WHERE helyszin_id = ?');

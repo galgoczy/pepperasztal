@@ -2,9 +2,11 @@
 """
 gepterheles.py - a gep terhelese egy jelentes-futas alatt (Windows).
 
-Egy futas (a percenkenti feladat, kb. 55 mp) elejen es vegen mintat vesz:
-  - rendszer: CPU-kihasznaltsag (GetSystemTimes), memoria (GlobalMemoryStatusEx)
-  - sajat: a Python-folyamat es az altala inditott isql-ek CPU-ideje,
+Egy futas (a percenkenti feladat) elejen es vegen mintat vesz:
+  - rendszer: CPU-kihasznaltsag az elozo futas vege ota, kb. egy percre
+    (GetSystemTimes), memoria (GlobalMemoryStatusEx)
+  - sajat: a Python-folyamat es az altala inditott isql-ek CPU-ideje
+    masodpercben, es ugyanez az egesz gep (minden mag) egy percere vetitve;
     a Python memoriaja (munkakeszlet, csucs)
   - InterBase: az ibserver.exe CPU-ja es memoriaja ugyanebben az idoben
 
@@ -140,8 +142,16 @@ def _minta():
 
 
 class Meres(object):
-    def __init__(self):
+    """
+    elozo: az elozo futas vegen mentett nyers rendszer-ido (gep_allapot.json
+    'nyers' mezoje). Ebbol a gep CPU-ja az elozo futas vege ota - tehat kb.
+    egy teljes percre - szamolhato, nem csak a mi futasunk par masodpercere
+    (az felfele torzitana, mert benne van a sajat terhelesunk).
+    """
+
+    def __init__(self, elozo=None):
         self.eleje = _minta()
+        self.elozo = elozo if isinstance(elozo, dict) else None
 
     def eredmeny(self):
         """Az inditas ota eltelt idore. Hiba eseten None."""
@@ -153,16 +163,27 @@ class Meres(object):
             ido = max(0.001, v["t"] - e["t"])
             ncpu = os.cpu_count() or 1
             ki = {"ido_mp": round(ido, 1), "cpu_db": ncpu}
-            if e["rendszer"] and v["rendszer"]:
-                di = v["rendszer"][0] - e["rendszer"][0]
-                dk = v["rendszer"][1] - e["rendszer"][1]
-                du = v["rendszer"][2] - e["rendszer"][2]
+            # A gep CPU-ja: az elozo futas vege ota (kb. 1 perc), ha van ilyen
+            # minta es nem regebbi 5 percnel; kulonben csak a futas alatt.
+            kezdet = e["rendszer"]
+            ablak = ido
+            el = self.elozo or {}
+            if (el.get("rendszer") and el.get("t")
+                    and 0 < v["t"] - el["t"] < 300):
+                kezdet, ablak = el["rendszer"], v["t"] - el["t"]
+            if kezdet and v["rendszer"]:
+                di = v["rendszer"][0] - kezdet[0]
+                dk = v["rendszer"][1] - kezdet[1]
+                du = v["rendszer"][2] - kezdet[2]
                 ossz = dk + du       # a kernel-ido az ures idot is tartalmazza
                 if ossz > 0:
                     ki["cpu_rendszer"] = round(100.0 * (ossz - di) / ossz, 1)
+                    ki["cpu_ablak_mp"] = round(ablak, 1)
+            # Az ugynok: CPU-masodperc ebben a futasban, es ugyanez az egesz
+            # gep (minden mag) egy percere vetitve - a feladat percenkent fut.
             sajat = (v["sajat"] or 0) - (e["sajat"] or 0) + v["gyerek"] - e["gyerek"]
             ki["sajat_cpu_mp"] = round(sajat, 2)
-            ki["sajat_cpu"] = round(100.0 * sajat / (ido * ncpu), 2)
+            ki["sajat_cpu"] = round(100.0 * sajat / (60.0 * ncpu), 2)
             m = _MEM()
             m.dwLength = ctypes.sizeof(_MEM)
             if _k32.GlobalMemoryStatusEx(ctypes.byref(m)):
@@ -182,6 +203,7 @@ class Meres(object):
                 ki["ib_cpu"] = round(100.0 * ib_cpu / (ido * ncpu), 2)
                 ki["ib_mem_mb"] = round(ib_mem, 1)
             ki["ido"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            ki["nyers"] = {"t": v["t"], "rendszer": v["rendszer"]}
             return ki
         except Exception as ex:
             return {"hiba": str(ex)[:160]}

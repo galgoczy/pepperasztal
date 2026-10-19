@@ -110,14 +110,15 @@ pa_show_flash();
 <?php if (!empty($a['frissites'])): ?>
 <tr><th>Utolsó frissítési kísérlet</th><td><?= h(($a['frissites']['ido'] ?? '') . ' – ' . ($a['frissites']['eredmeny'] ?? '')) ?></td></tr>
 <?php endif; ?>
-<?php $g = is_array($a['gep'] ?? null) ? $a['gep'] : []; ?>
+<?php $g = pa_terheles($a); ?>
 <tr><th>Gép terhelése</th><td><?php if ($g && !isset($g['hiba'])): ?>
-  CPU <?= h((string)($g['cpu_rendszer'] ?? '–')) ?>% · memória <?= h((string)($g['mem_terheles'] ?? '–')) ?>%
-  (szabad <?= h(number_format((int)($g['mem_szabad_mb'] ?? 0), 0, ',', ' ')) ?> MB)
-  <br><span class="muted">Ügynök: CPU <?= h((string)($g['sajat_cpu'] ?? '–')) ?>%
-  (<?= h((string)($g['sajat_cpu_mp'] ?? '–')) ?> mp / <?= h((string)($g['ido_mp'] ?? '–')) ?> mp),
+  CPU <?= h((string)($g['cpu_rendszer'] ?? '–')) ?>% <?= $g['perc_ablak'] ? '(az elmúlt ' . (int)round((float)$g['cpu_ablak_mp']) . ' mp)' : '(csak az ügynök futása alatt – régi ügynök)' ?>
+  · memória <?= h((string)($g['mem_terheles'] ?? '–')) ?>%
+  (szabad <?= h(number_format((int)($g['mem_szabad_mb'] ?? 0), 0, ',', ' ')) ?> / <?= h(number_format((int)($g['mem_ossz_mb'] ?? 0), 0, ',', ' ')) ?> MB) · <?= (int)$g['mag'] ?> mag
+  <br><span class="muted">Ügynök: <?= h((string)($g['sajat_cpu_mp'] ?? '–')) ?> CPU-mp percenként
+  = az egész gép <?= h((string)($g['ugynok_perc'] ?? '–')) ?>%-a,
   memória <?= h((string)($g['sajat_mem_mb'] ?? '–')) ?> MB
-  <?php if (isset($g['ib_cpu'])): ?> · InterBase: CPU <?= h((string)$g['ib_cpu']) ?>%, memória <?= h((string)($g['ib_mem_mb'] ?? '–')) ?> MB<?php endif; ?>
+  <?php if (isset($g['ib_cpu'])): ?> · InterBase: memória <?= h((string)($g['ib_mem_mb'] ?? '–')) ?> MB<?php endif; ?>
   · <?= h((string)($g['ido'] ?? '')) ?></span>
 <?php elseif ($g): ?><span class="bad"><?= h((string)$g['hiba']) ?></span>
 <?php else: ?><span class="muted">nincs adat (ügynök 2026-10-19.5 vagy újabb kell)</span><?php endif; ?></td></tr>

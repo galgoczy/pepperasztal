@@ -71,3 +71,23 @@ function pa_json(?string $s): array
     $d = json_decode((string)$s, true);
     return is_array($d) ? $d : [];
 }
+
+/**
+ * A gep terhelese a jelentesbol, egysegesen. Az ugynok CPU-ja az egesz gep
+ * (minden mag) egy percere vetitve: CPU-masodperc / (60 * magok szama).
+ * A 2026-10-19.5-os ugynok a "gep" kulcson kuldte, es a gep CPU-jat csak a
+ * sajat futasa alatt merte (ezt "futas alatt" jeloli).
+ */
+function pa_terheles(array $a): array
+{
+    $g = $a['terheles'] ?? (is_array($a['gep'] ?? null) ? $a['gep'] : null);
+    if (!is_array($g) || isset($g['hiba'])) {
+        return is_array($g) ? ['hiba' => (string)$g['hiba']] : [];
+    }
+    $mag = max(1, (int)($g['cpu_db'] ?? 1));
+    $ki = $g + ['mag' => $mag, 'perc_ablak' => isset($g['cpu_ablak_mp'])];
+    if (isset($g['sajat_cpu_mp'])) {
+        $ki['ugynok_perc'] = round(100.0 * (float)$g['sajat_cpu_mp'] / (60.0 * $mag), 2);
+    }
+    return $ki;
+}

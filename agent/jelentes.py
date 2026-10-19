@@ -101,7 +101,8 @@ def payload(cfg):
         "mentes": read_json(MENTES) or {},
         "frissites": read_json(FRISSITES),
         # az elozo futas (kb. 1 perc) terhelese - lasd gepterheles.py
-        "gep": read_json(GEP),
+        # (kulon kulcs: a "gep" a gep neve)
+        "terheles": _terheles(),
         # be van-e kapcsolva az iras ([iras] be = igen) - az admin ez alapjan
         # mutatja az egyenleg-modositast
         "iras_be": bool(cfg.iras["be"]),
@@ -195,6 +196,13 @@ def _ini_token_sor(szoveg):
             if m and m.group(1).strip():
                 return i, m.group(1).strip()
     return None
+
+
+def _terheles():
+    t = read_json(GEP)
+    if isinstance(t, dict):
+        t = dict((k, v) for k, v in t.items() if k != "nyers")
+    return t
 
 
 def zarol():
@@ -319,7 +327,7 @@ def main():
     t0 = time.time()
     try:
         import gepterheles
-        meres = gepterheles.Meres()
+        meres = gepterheles.Meres((read_json(GEP) or {}).get("nyers"))
     except Exception:
         meres = None
     try:

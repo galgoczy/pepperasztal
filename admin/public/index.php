@@ -82,7 +82,7 @@ if ((string)(pa_config()['setup_code'] ?? '') !== '') {
 }
 ?>
 <h1>Helyszínek</h1>
-<p class="sub">Életjel percenként. Zöld: 3 percen belül, sárga: 15 percen belül.
+<p class="sub">Gép: CPU és memória az elmúlt percre (* = régi ügynök, csak a saját futása alatt mérve); az ügynök CPU-ja az egész gép egy percére vetítve.<br>Életjel percenként. Zöld: 3 percen belül, sárga: 15 percen belül.
 Az oldal 30 másodpercenként frissül.</p>
 
 <div class="card scroll"><table>
@@ -111,10 +111,10 @@ Az oldal 30 másodpercenként frissül.</p>
   <td class="<?= !$r['ido'] ? 'muted' : (!empty($dbs['ok']) ? 'ok' : 'bad') ?>">
       <?= !$r['ido'] ? '–' : (!empty($dbs['ok']) ? 'elérhető' : 'HIBA') ?>
       <?php if (isset($dbs['naplo_gen'])): ?><div class="muted">napló #<?= (int)$dbs['naplo_gen'] ?></div><?php endif; ?></td>
-  <?php $g = is_array($a['gep'] ?? null) ? $a['gep'] : []; ?>
+  <?php $g = pa_terheles($a); ?>
   <td><?php if (isset($g['cpu_rendszer'])): ?>
-      CPU <?= h((string)$g['cpu_rendszer']) ?>% · mem <?= h((string)($g['mem_terheles'] ?? '–')) ?>%
-      <div class="muted">ügynök <?= h((string)($g['sajat_cpu'] ?? '–')) ?>%<?= isset($g['ib_cpu']) ? ' · IB ' . h((string)$g['ib_cpu']) . '%' : '' ?></div>
+      CPU <?= h((string)$g['cpu_rendszer']) ?>%<?= $g['perc_ablak'] ? '' : '*' ?> · mem <?= h((string)($g['mem_terheles'] ?? '–')) ?>%
+      <div class="muted">ügynök <?= h((string)($g['ugynok_perc'] ?? '–')) ?>% · <?= (int)$g['mag'] ?> mag</div>
       <?php else: ?><span class="muted">–</span><?php endif; ?></td>
   <td class="<?= $r['ido'] ? $ej : 'muted' ?>"><?= h(pa_ago($m['utolso_mentes'] ?? null)) ?>
       <?php if (!empty($m['archiv_meret_mb'])): ?><div class="muted"><?= h((string)$m['archiv_meret_mb']) ?> MB</div><?php endif; ?>
