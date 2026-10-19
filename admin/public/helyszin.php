@@ -47,7 +47,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     } elseif ($mit === 'egyenleg') {
         $a0 = pa_json($s['adat']);
         $kid = (int)($_POST['kartya'] ?? 0);
-        $osszeg = str_replace([' ', ','], ['', '.'], (string)($_POST['osszeg'] ?? ''));
+        // Telefonon a szokoz lehet nem tores (NBSP), a minusz nagykotojel.
+        $osszeg = preg_replace('/[\s\x{00A0}\x{202F}]+/u', '', (string)($_POST['osszeg'] ?? '')) ?? '';
+        $osszeg = str_replace([',', '−', '–', '—'], ['.', '-', '-', '-'], $osszeg);
+        if (($_POST['irany'] ?? '') === 'le' && $osszeg !== '' && $osszeg[0] !== '-') {
+            $osszeg = '-' . $osszeg;
+        }
         $van = $db->prepare('SELECT COUNT(*) FROM kartya WHERE helyszin_id = ? AND kartya_id = ?');
         $van->execute([$id, $kid]);
         if (empty($a0['iras_be'])) {
@@ -238,11 +243,15 @@ $parancsok = $pst->fetchAll();
       (<?= $k['egyenleg'] !== null ? h(number_format((float)$k['egyenleg'], 0, ',', ' ')) . ' Ft' : '–' ?>)</option>
     <?php endforeach; ?>
   </select>
-  <input type="text" name="osszeg" placeholder="Összeg, pl. 1000 vagy -500" inputmode="decimal" required style="width:170px">
+  <select name="irany">
+    <option value="fel">Feltöltés (+)</option>
+    <option value="le">Levonás (−)</option>
+  </select>
+  <input type="text" name="osszeg" placeholder="Összeg, pl. 1000" inputmode="decimal" required style="width:130px">
   <input type="text" name="megj" placeholder="Megjegyzés (nem kötelező)" maxlength="200">
   <button class="btn primary">Végrehajtás</button>
 </form>
-<p class="muted">Feltöltés: pozitív, levonás: negatív összeg. A kasszában „KF” naplósorként jelenik meg, ahogy a NovoHost saját feltöltése.
+<p class="muted">A levonás a kasszában negatív „KF” sor; a kasszában „KF” naplósorként jelenik meg, ahogy a NovoHost saját feltöltése.
 Az utasítás 10 percig érvényes; ha a gép addig nem veszi fel, lejár.</p>
 <?php endif; ?>
 <?php if ($parancsok): ?>
