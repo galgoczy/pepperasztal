@@ -15,8 +15,11 @@ A POS gépek ügynökeinek felhős oldala a Hostingeren (PHP + MySQL). Az
   napló szerint), a napi egyeztetés eredménye és a legutóbbi mozgások. A
   kártya neve titkosítva tárolódik (`adat_kulcs`), és alapból csillagozva
   látszik. Kapcsolóval kezdőbetűs vagy teljes nézetre lehet váltani; a
-  teljes nézet 15 percig tart, és bekerül az eseménynaplóba. Kártyakód nem
-  jön fel.
+  teljes nézet 15 percig tart, és bekerül az eseménynaplóba.
+- **Vonalkód:** a kártyakód is titkosítva tárolódik; a *Vonalkód* oldalon
+  (vagy a kártyalista ▮▯▮ jelére) a telefon kijelzőjén vonalkódként
+  jelenik meg, a pénztári olvasóval beolvasható. Minden megjelenítés
+  naplózott. Kézzel beírt kódból is rajzol (az csak a telefonon marad).
 - **Élő kártyamozgások:** nyitvatartásban egy kártyás fizetés a vásárolt
   tételekkel néhány másodpercen belül látszik a helyszín oldalán (az oldal
   10 másodpercenként frissül).
@@ -124,9 +127,10 @@ nem, kiadás nem készül, és a hiba látszik az Action naplójában.
   sikertelen belépés 15 percenként, 8 óra tétlenség után kilépés.
 - **A webről nem érhető el:** a konfiguráció, a `lib/` és a `kiadasok/` mappa.
 - **Személyes adat:** a feltöltős kártyák neve AES-256-GCM-mel titkosítva
-  van az adatbázisban; a kulcs csak a konfigurációban van, így egy
-  adatbázis-mentésből a név nem olvasható ki. Kártyakód, nyugta és
-  személyzeti kártya nem jön fel. A gépen a nevek küldése kikapcsolható
+  van az adatbázisban (a kártyakód is); a kulcs csak a konfigurációban
+  van, így egy adatbázis-mentésből egyik sem olvasható ki. Nyugta és
+  személyzeti kártya nem jön fel. A kódok küldése kikapcsolható
+  (`[kartyak] kodok = nem`). A gépen a nevek küldése kikapcsolható
   (`[kartyak] nevek = nem`), ekkor a szerver a tárolt neveket is törli.
 
 ## Oldalak
@@ -137,6 +141,7 @@ nem, kiadás nem készül, és a hiba látszik az Action naplójában.
 | `/helyszin.php?id=…` | egy helyszín részletei, célverzió, token, nyers jelentés |
 | `/naplo.php` | eseménynapló |
 | `/passkey.php` | saját passkeyek: felvétel, törlés |
+| `/vonalkod.php` | kártyakód vonalkódként a telefonon (naplózott) |
 | `/google.php` | Google-belépés (indulás és visszatérés) |
 | `/elso-passkey.php` | első passkey beállító kóddal (csak ha van `setup_code`) |
 | `/api/passkey.php` | passkey-műveletek az oldalak JavaScriptjének |

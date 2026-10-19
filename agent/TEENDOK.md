@@ -55,8 +55,11 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   Szentkirályi stabil. Lépések: README, 7. pont.
 
 - **A meglévő kártyák mágneskártyák** (a `;…?` kódforma a mágnescsík
-  2. sávja). Vonalkódos egyelőre csak a 610-es tesztkártya lesz, ezért a
-  kártyakódokat nem kérjük le a felhőbe.
+  2. sávja). A kódok titkosítva felmennek (2026-10-19.9), az admin
+  Vonalkód oldala ebből rajzol. Vonalkóddal egyelőre csak a 610-es
+  tesztkártyát használjuk. Ahol vonalkód-olvasó van, bármelyik kártya
+  kódjából készült vonalkóddal lehet fizetni – a kódok megjelenítése ezért
+  naplózott.
 - **Vonalkód-teszt a régi USB-s olvasóval.** Telefon maximális fényerőn,
   először Jegyzettömbbe olvasva: beolvassa-e a kijelzőt, és helyesen
   érkeznek-e a `;` és `?` karakterek. Utána a NovoHost VIP-kártyás ablakában
