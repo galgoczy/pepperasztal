@@ -229,8 +229,9 @@ szerver vissza nem igazolja, minden jelentéssel újraküldi. A 10 percnél
 régebbi utasítás lejár.
 
 **Gépterhelés:** minden futás méri a gép CPU- és memóriaterhelését, az
-ügynökét (Python + isql) és az InterBase-ét (`ibserver.exe`); a következő
-életjel viszi fel.
+ügynökét (Python + isql) és az InterBase-ét (`ibserver.exe`), valamint a
+legtöbb CPU-t vivő folyamatok nevét (csak a fájlnév) az elmúlt percben; a
+következő életjel viszi fel.
 
 Ha az adminban erre a helyszínre ki van jelölve egy újabb kiadás, átadja a
 `frissito.py`-nak. Az telepítés előtt ellenőrzi:
