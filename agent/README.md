@@ -12,6 +12,7 @@ Ez a 0. fázis: **mentés, korlátozott adatbázis-felhasználók és felderít�
 | `felderites.py` | csak olvasó felmérés a VIP-app tervezéséhez | nem |
 | `jelentes.py` + `install_jelentes.bat` | percenkénti életjel a Pepper Adminnak; ha ki van jelölve, frissít | nem |
 | `kartyak.py` | a feltöltős kártyák mozgásai, egyenlegei és a vásárolt tételek (`jelentes.py` hívja) | nem |
+| `iras.py` | egyenleg-módosítás az admin utasítására – csak `[iras] be = igen` mellett | **igen** (`PEPPER_VIP`) |
 | `gepterheles.py` | a gép CPU- és memóriaterhelése, az ügynöké és az InterBase-é külön | nem |
 | `frissito.py` | aláírt kiadás telepítése – **ez maga soha nem frissül távolról** | nem |
 | `kiadas_kulcs.txt` | a kiadások publikus kulcsa (kézzel kerül a gépre, a frissítés nem írja át) | – |
@@ -217,6 +218,15 @@ percenkénti futás nem lép ki azonnal: kb. 50 másodpercig 5 másodpercenként
 ránéz a kártyanaplóra (egy apró lekérdezés), és csak változáskor küld. Egy
 kártyás fizetés így néhány másodpercen belül látszik. Új ütemezett feladat
 nem kell hozzá; két futás sosem fut egyszerre (`jelentes.lock`).
+
+**Egyenleg-módosítás az adminból** (`iras.py`): a percenkénti jelentés
+válaszában jöhet utasítás (feltöltés vagy levonás egy feltöltős kártyán).
+A gép csak akkor hajtja végre, ha az ini-ben `[iras]` → `be = igen`; ez
+gépenként, helyben kapcsolható, a felhőből nem. Pontosan úgy ír, ahogy a
+NovoHost saját feltöltése (`KF` naplósor, a levonás negatív `KF`). Minden
+utasítás egyszer fut le; a gép az eredményt visszaolvasva jelenti, és amíg a
+szerver vissza nem igazolja, minden jelentéssel újraküldi. A 10 percnél
+régebbi utasítás lejár.
 
 **Gépterhelés:** minden futás méri a gép CPU- és memóriaterhelését, az
 ügynökét (Python + isql) és az InterBase-ét (`ibserver.exe`); a következő

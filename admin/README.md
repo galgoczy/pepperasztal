@@ -20,6 +20,11 @@ A POS gépek ügynökeinek felhős oldala a Hostingeren (PHP + MySQL). Az
 - **Élő kártyamozgások:** nyitvatartásban egy kártyás fizetés a vásárolt
   tételekkel néhány másodpercen belül látszik a helyszín oldalán (az oldal
   10 másodpercenként frissül).
+- **Egyenleg módosítása** (teszt): a helyszín oldalán feltöltés vagy
+  levonás egy feltöltős kártyán. Csak ott jelenik meg és csak ott fut le,
+  ahol a gép ini-jében `[iras] be = igen` áll. Az utasítás 10 percig
+  érvényes; állapota (vár / megkapta / kész / hiba / lejárt) és az új
+  egyenleg a listában látszik, a kérés és az eredmény az eseménynaplóban.
 - **Gépterhelés:** CPU és memória a gépen, külön az ügynöké és az
   InterBase-é – a kezdőlapon és a helyszín oldalán.
 - **Tokenek:** helyszínenként egy token. Felvételkor és cserekor egyszer
@@ -30,8 +35,9 @@ A POS gépek ügynökeinek felhős oldala a Hostingeren (PHP + MySQL). Az
   (kb. 1 perc) letölti, ellenőrzi és telepíti.
 - **Eseménynapló:** belépések, sikertelen belépések, token- és
   frissítési műveletek.
-- **Visszaállítás innen szándékosan nem indítható**, és a gépnek parancsot
-  sem küldünk. A kommunikáció egyirányú: a gép jelent, a felhő válaszol.
+- **Visszaállítás innen szándékosan nem indítható.** A gépnek csak
+  egyenleg-módosítást küldhetünk, és azt is csak ott hajtja végre, ahol
+  helyben be van kapcsolva.
 
 ## Beállítás (egyszer)
 

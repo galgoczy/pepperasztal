@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-const PA_SCHEMA_VERSION = 5;
+const PA_SCHEMA_VERSION = 6;
 
 function pa_is_sqlite(): bool
 {
@@ -98,6 +98,20 @@ function pa_migrate(): void
         v MEDIUMTEXT NULL,
         ido VARCHAR(19) NOT NULL,
         PRIMARY KEY (helyszin_id, k))$tail");
+    // 6: utasitasok a gepnek (egyenleg-modositas) - lib/parancs.php
+    $db->exec("CREATE TABLE IF NOT EXISTS parancs (
+        id $pk,
+        helyszin_id INT NOT NULL,
+        tipus VARCHAR(16) NOT NULL,
+        kartya_id INT NOT NULL,
+        osszeg DECIMAL(14,2) NOT NULL,
+        megjegyzes VARCHAR(200) NULL,
+        letrehozta VARCHAR(64) NOT NULL,
+        letrehozva VARCHAR(19) NOT NULL,
+        allapot VARCHAR(10) NOT NULL,
+        kuldve VARCHAR(19) NULL,
+        eredmeny TEXT NULL,
+        frissitve VARCHAR(19) NULL)$tail");
     // 5: mit vett - a koltes (FK naplosor) nyugtajanak tetelei JSON-ban
     $db->exec("CREATE TABLE IF NOT EXISTS kartyavasarlas (
         helyszin_id INT NOT NULL,

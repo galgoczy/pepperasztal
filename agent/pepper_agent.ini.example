@@ -72,6 +72,15 @@ tol = 6
 ig = 21
 utem = 5
 
+[iras]
+; Egyenleg-modositas (feltoltes / levonas) a Pepper Admin utasitasara, a
+; PEPPER_VIP felhasznaloval. Alapbol KI: csak ahol itt be = igen all, ott
+; hajt vegre a gep barmilyen irast. A 10 percnel regebbi utasitas lejar.
+; kezelo / pg: a naplosor KEZELO es PG mezoje (Szentkiralyin 16 / 1).
+be = nem
+; kezelo = 16
+; pg = 1
+
 [backup]
 ; Helyi mentesek. NE a Program Files ala (VirtualStore-csapda).
 ; A pontos meretet (DB / gbk / archivum) az elso futas naploja kiirja.

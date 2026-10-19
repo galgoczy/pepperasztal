@@ -102,7 +102,17 @@ def payload(cfg):
         "frissites": read_json(FRISSITES),
         # az elozo futas (kb. 1 perc) terhelese - lasd gepterheles.py
         "gep": read_json(GEP),
+        # be van-e kapcsolva az iras ([iras] be = igen) - az admin ez alapjan
+        # mutatja az egyenleg-modositast
+        "iras_be": bool(cfg.iras["be"]),
     }
+    try:
+        import iras
+        k = iras.kuldendo()
+        if k:
+            d["parancs_eredmeny"] = k
+    except Exception as e:
+        log("iras-eredmenyek olvasasa: {0}".format(e))
     # Feltoltos kartyak mozgasai (kartyak.py). Hiba eseten az eletjel
     # akkor is elmegy, a hiba pedig latszik az adminban.
     try:
@@ -338,6 +348,20 @@ def futas(cfg, url, token, args, t0):
         resp = {"ok": False, "hiba": "kapcsolodasi hiba: {0}".format(e)}
     if args.proba:
         print("\nValasz:", json.dumps(resp, ensure_ascii=False))
+    try:
+        import iras
+        iras.nyugtaz(resp)
+        if resp.get("ok") and resp.get("parancsok"):
+            # Az admin utasitasai: vegrehajtas, es az eredmeny azonnal fel.
+            iras.vegrehajt(cfg, resp["parancsok"])
+            r2 = post(url, token, {
+                "helyszin": cfg.helyszin, "agent_verzio": AGENT_VERSION,
+                "gyors": True, "ido": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "parancs_eredmeny": iras.kuldendo()})
+            iras.nyugtaz(r2)
+    except Exception as e:
+        log("iras hiba: {0}".format(str(e)[:200]))
+
     ki = data.get("kartyak")
     if ki and "hiba" not in ki:
         try:

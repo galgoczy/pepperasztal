@@ -4,6 +4,7 @@
 declare(strict_types=1);
 require __DIR__ . '/lib/app.php';
 require __DIR__ . '/lib/kartyak.php';
+require __DIR__ . '/lib/parancs.php';
 
 $user = pa_require_login();
 $db = pa_db();
@@ -43,6 +44,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             pa_audit($user, 'cel_beallitva', $s['kulcs'] . ' -> ' . $v);
             pa_flash('Célverzió: ' . h($v) . '. A gép a következő jelentésnél (kb. 1 perc) frissül.');
         }
+    } elseif ($mit === 'egyenleg') {
+        $a0 = pa_json($s['adat']);
+        $kid = (int)($_POST['kartya'] ?? 0);
+        $osszeg = str_replace([' ', ','], ['', '.'], (string)($_POST['osszeg'] ?? ''));
+        $van = $db->prepare('SELECT COUNT(*) FROM kartya WHERE helyszin_id = ? AND kartya_id = ?');
+        $van->execute([$id, $kid]);
+        if (empty($a0['iras_be'])) {
+            pa_flash('Ezen a gépen az írás nincs bekapcsolva ([iras] be = igen az ini-ben).', 'bad');
+        } elseif (!(int)$van->fetchColumn()) {
+            pa_flash('Ismeretlen kártya.', 'bad');
+        } elseif (!preg_match('/^-?\d{1,7}(\.\d{1,2})?$/', $osszeg) || (float)$osszeg == 0.0) {
+            pa_flash('Az összeg egy nem nulla szám legyen (levonásnál mínusz előjellel).', 'bad');
+        } else {
+            $pid = pa_parancs_uj($id, $kid, (float)$osszeg, trim((string)($_POST['megj'] ?? '')), $user);
+            pa_audit($user, 'egyenleg_kert', $s['kulcs'] . ' #' . $pid . ' kártya ' . $kid . ': ' . $osszeg . ' Ft');
+            pa_flash('Utasítás elküldve (#' . $pid . '). A gép a következő percenkénti jelentésnél hajtja végre.');
+        }
+        pa_redirect($self . '#iras');
     } elseif ($mit === 'nevmod') {
         pa_nev_mod_beallit((string)($_POST['mod'] ?? ''), $user, $s['kulcs']);
         pa_redirect($self . '#kartyak');
@@ -53,7 +72,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             pa_audit($user, 'atnevezve', $s['kulcs'] . ' -> ' . $nev);
         }
     } elseif ($mit === 'torles' && ($_POST['megerosit'] ?? '') === $s['kulcs']) {
-        foreach (['jelentes', 'kartya', 'kartyamozgas', 'kartyavasarlas', 'helyszin_allapot'] as $t) {
+        foreach (['jelentes', 'kartya', 'kartyamozgas', 'kartyavasarlas', 'parancs', 'helyszin_allapot'] as $t) {
             $db->prepare("DELETE FROM $t WHERE helyszin_id = ?")->execute([$id]);
         }
         $db->prepare('DELETE FROM helyszin WHERE id = ?')->execute([$id]);
@@ -193,6 +212,51 @@ A kulcs csak a szerveren legyen; ha elveszik, a gépek a neveket újra felküldi
   <td class="<?= $all === 'ok' ? 'ok' : ($all === 'eltér' ? 'bad' : 'muted') ?>"><?= h($all) ?></td>
   <td><?= h($k['utolso_mozgas'] ?? '–') ?></td>
   <td class="num"><?= (int)$k['mozgas'] ?></td>
+</tr>
+<?php endforeach; ?>
+</table></div>
+<?php endif; ?>
+
+<h2 id="iras">Egyenleg módosítása</h2>
+<?php
+$pst = $db->prepare('SELECT * FROM parancs WHERE helyszin_id = ? ORDER BY id DESC LIMIT 10');
+$pst->execute([$id]);
+$parancsok = $pst->fetchAll();
+?>
+<?php if (empty($a['iras_be'])): ?>
+<p class="muted">Ezen a gépen az írás nincs bekapcsolva. Bekapcsolás a gépen, a <code>pepper_agent.ini</code>-ben:
+<code>[iras]</code> / <code>be = igen</code> (ügynök 2026-10-19.6 vagy újabb).</p>
+<?php elseif ($kartyak): ?>
+<form method="post" class="row" data-confirm="Biztosan módosítod a kártya egyenlegét? Ez a kasszában is megjelenik.">
+  <?= pa_csrf_field() ?><input type="hidden" name="mit" value="egyenleg">
+  <select name="kartya" required>
+    <?php foreach ($kartyak as $k): ?>
+    <option value="<?= (int)$k['kartya_id'] ?>"><?= (int)$k['kartya_id'] ?><?= $k['nev_titkos'] !== null ? ' · ' . h(pa_nev_mutat($k['nev_titkos'], $id, (int)$k['kartya_id'], $nmod)) : '' ?>
+      (<?= $k['egyenleg'] !== null ? h(number_format((float)$k['egyenleg'], 0, ',', ' ')) . ' Ft' : '–' ?>)</option>
+    <?php endforeach; ?>
+  </select>
+  <input type="text" name="osszeg" placeholder="Összeg, pl. 1000 vagy -500" inputmode="decimal" required style="width:170px">
+  <input type="text" name="megj" placeholder="Megjegyzés (nem kötelező)" maxlength="200">
+  <button class="btn primary">Végrehajtás</button>
+</form>
+<p class="muted">Feltöltés: pozitív, levonás: negatív összeg. A kasszában „KF” naplósorként jelenik meg, ahogy a NovoHost saját feltöltése.
+Az utasítás 10 percig érvényes; ha a gép addig nem veszi fel, lejár.</p>
+<?php endif; ?>
+<?php if ($parancsok): ?>
+<div class="card scroll"><table>
+<tr><th>#</th><th>Kérve</th><th>Kártya</th><th class="num">Összeg</th><th>Állapot</th><th>Eredmény</th><th>Ki</th></tr>
+<?php foreach ($parancsok as $pr): $er = json_decode((string)$pr['eredmeny'], true) ?: []; ?>
+<tr>
+  <td class="mono"><?= (int)$pr['id'] ?></td>
+  <td><?= h($pr['letrehozva']) ?></td>
+  <td class="mono"><?= (int)$pr['kartya_id'] ?></td>
+  <td class="num"><?= h(number_format((float)$pr['osszeg'], 0, ',', ' ')) ?></td>
+  <td class="<?= $pr['allapot'] === 'kesz' ? 'ok' : (in_array($pr['allapot'], ['hiba', 'lejart'], true) ? 'bad' : 'warn') ?>">
+    <?= h(['var' => 'vár a gépre', 'kuldve' => 'a gép megkapta', 'kesz' => 'kész', 'hiba' => 'hiba', 'lejart' => 'lejárt'][$pr['allapot']] ?? $pr['allapot']) ?></td>
+  <td class="small"><?php if (!empty($er['ok'])): ?>új egyenleg: <?= h(number_format((float)$er['egyenleg'], 0, ',', ' ')) ?> Ft (napló #<?= (int)$er['naplo_id'] ?>)
+    <?php elseif (!empty($er['hiba'])): ?><span class="bad"><?= h($er['hiba']) ?></span><?php endif; ?>
+    <?php if ($pr['megjegyzes']): ?><div class="muted"><?= h($pr['megjegyzes']) ?></div><?php endif; ?></td>
+  <td><?= h($pr['letrehozta']) ?></td>
 </tr>
 <?php endforeach; ?>
 </table></div>

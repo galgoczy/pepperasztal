@@ -15,7 +15,9 @@
  * "gyors": true - percen beluli kartyajelentes, csak a kartyaadatot menti.
  * A frissitest a gep csak akkor kapja meg, ha az adminban erre a
  * helyszinre ki lett jelolve (cel_verzio), es van ilyen alairt kiadas.
- * PARANCSOT a felho nem kuld - a kommunikacio egyiranyu.
+ * Utasitas (lib/parancs.php): a valasz "parancsok" mezojeben, ha az adminban
+ * egyenleg-modositast kertek. A gep csak [iras] be = igen eseten hajtja vegre;
+ * az eredmenyt a kovetkezo jelentes "parancs_eredmeny" mezoje hozza.
  */
 
 declare(strict_types=1);
@@ -23,6 +25,7 @@ require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/schema.php';
 require __DIR__ . '/../lib/kiadas.php';
 require __DIR__ . '/../lib/kartyak.php';
+require __DIR__ . '/../lib/parancs.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -66,6 +69,12 @@ try {
 
     $valasz = [];
     $kinfo = null;
+    // A gep eredmenyei a korabbi utasitasokra (gyors es normal jelentesben is).
+    if (isset($in['parancs_eredmeny']) && is_array($in['parancs_eredmeny'])) {
+        $valasz['parancs_ack'] = pa_parancs_eredmeny((int)$site['id'], $site['kulcs'],
+            $in['parancs_eredmeny']);
+        unset($in['parancs_eredmeny']);
+    }
     if (isset($in['kartyak']) && is_array($in['kartyak'])) {
         try {
             $valasz = pa_kartyak_fogad((int)$site['id'], $in['kartyak']);
@@ -110,6 +119,11 @@ try {
         if ($k) {
             $frissites = ['verzio' => $k['verzio'], 'sha256' => $k['sha256']];
         }
+    }
+    // Utasitasok a gepnek (csak a percenkenti jelentes valaszaban).
+    $parancsok = pa_parancs_kiad((int)$site['id']);
+    if ($parancsok) {
+        $valasz['parancsok'] = $parancsok;
     }
     echo json_encode(['ok' => true, 'szerver_ido' => pa_now(), 'frissites' => $frissites] + $valasz,
         JSON_UNESCAPED_UNICODE);

@@ -22,8 +22,13 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 - **Élő kártyamozgások, vásárolt tételek, gépterhelés (2026-10-19.5):**
   távoli frissítéssel megy fel. A gépterhelés-mérés Windows API-t használ,
   élesben még nem futott – az első jelentések után ellenőrizni.
-- **Feltöltés / levonás az adminból (tesztkártyán):** a felhőből a gépre
-  menő első utasítás. Döntés kell a védelemről (lásd a beszélgetést).
+- **Feltöltés / levonás az adminból (2026-10-19.6):** kész, csak
+  Szentkirályin bekapcsolva (`[iras] be = igen`). Tesztkártya: Minta Géza
+  (610). Éles használat előtt: aláírt utasítás (a kulcs ne a szerveren
+  legyen), és kétlépcsős azonosítás a Google-, Hostinger- és GitHub-fiókon.
+- **Tesztfelhasználó felvétele az adminból:** félretéve.
+- **A novohost-cloud `python/vip_test_write.py` nyílt SYSDBA-jelszót
+  tartalmaz** – onnan törölni (a git-előzményben megmarad).
 
 - **Feltöltős kártyák a felhőben (2026-10-18.1):** a `kartyak.py` csak
   olvasva küldi a `KARTYANAPLO` feltöltős sorait, az egyenlegeket, a neveket

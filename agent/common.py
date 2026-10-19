@@ -26,7 +26,7 @@ import time
 
 # Minden kiadasnal noveld - a scriptek indulaskor kiirjak, igy egy
 # hibajelentesbol azonnal latszik, melyik verzio fut a gepen.
-AGENT_VERSION = "2026-10-19.5"
+AGENT_VERSION = "2026-10-19.6"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INI_PATH = os.path.join(HERE, "pepper_agent.ini")
@@ -80,6 +80,10 @@ class Config(object):
         # Gyakori ellenorzes nyitvatartasban: a percenkenti feladat ennyi
         # masodpercenkent nez ra a kartyanaplora, mielott kilep (tol-ig ora).
         self.gyors = {"be": True, "tol": 6, "ig": 21, "utem": 5}
+        # Iras a felho utasitasara (iras.py): alapbol KI. Csak az a gep ir,
+        # ahol az ini-ben [iras] be = igen all. kezelo/pg: a naplosor
+        # KEZELO es PG mezoje (Szentkiralyin a feltoltest a 16-os kezelo irja).
+        self.iras = {"be": False, "kezelo": 16, "pg": 1}
         self.loaded_from = None
 
     def security_db_path(self):
@@ -164,6 +168,12 @@ def load_config(path=INI_PATH):
             not in ("nem", "no", "false", "0", "off", "ki")
         k["kezdet"] = cfg.getint("kartyak", "kezdet", fallback=0)
         k["lap"] = max(10, min(1000, cfg.getint("kartyak", "lap", fallback=300)))
+    if cfg.has_section("iras"):
+        w = c.iras
+        w["be"] = cfg.get("iras", "be", fallback="nem").strip().lower() \
+            in ("igen", "yes", "true", "1", "on", "be")
+        w["kezelo"] = cfg.getint("iras", "kezelo", fallback=16)
+        w["pg"] = cfg.getint("iras", "pg", fallback=1)
     if cfg.has_section("gyors"):
         g = c.gyors
         g["be"] = cfg.get("gyors", "be", fallback="igen").strip().lower() \
