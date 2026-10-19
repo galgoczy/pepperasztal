@@ -64,7 +64,8 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   3 jegyű sorszám + egy dátum, amely egy adagon belül a legtöbb kártyán
   azonos. Minta Géza (610): `;00000000001?`. Saját kiosztásnál ettől jól
   elkülönülő tartomány kell (pl. saját „dátum”-blokk), hogy ne ütközzön a
-  NovoHost-kártyákkal; a többi helyszín formája még ellenőrizendő.
+  NovoHost-kártyákkal. A dátumok múltbeliek (valószínűleg a kártyaadag
+  gyártási/kódolási napja). TTK-ban ugyanez a forma (2021–2024-es adagok).
 - **Vonalkód-teszt a régi USB-s olvasóval.** Telefon maximális fényerőn,
   először Jegyzettömbbe olvasva: beolvassa-e a kijelzőt, és helyesen
   érkeznek-e a `;` és `?` karakterek. Utána a NovoHost VIP-kártyás ablakában
