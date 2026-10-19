@@ -11,7 +11,8 @@ Ez a 0. fázis: **mentés, korlátozott adatbázis-felhasználók és felderít�
 | `setup_users.py` | `PEPPER_OLVAS` és `PEPPER_VIP` felhasználó és a jogaik | csak jogosultságot (GRANT) |
 | `felderites.py` | csak olvasó felmérés a VIP-app tervezéséhez | nem |
 | `jelentes.py` + `install_jelentes.bat` | percenkénti életjel a Pepper Adminnak; ha ki van jelölve, frissít | nem |
-| `kartyak.py` | a feltöltős kártyák mozgásai és egyenlegei a jelentéssel (`jelentes.py` hívja) | nem |
+| `kartyak.py` | a feltöltős kártyák mozgásai, egyenlegei és a vásárolt tételek (`jelentes.py` hívja) | nem |
+| `gepterheles.py` | a gép CPU- és memóriaterhelése, az ügynöké és az InterBase-é külön | nem |
 | `frissito.py` | aláírt kiadás telepítése – **ez maga soha nem frissül távolról** | nem |
 | `kiadas_kulcs.txt` | a kiadások publikus kulcsa (kézzel kerül a gépre, a frissítés nem írja át) | – |
 | `cacert.pem` | tanúsítványok a HTTPS-hez (friss Windowson a rendszer-tár hiányos lehet) | – |
@@ -205,6 +206,21 @@ megy fel. A
 gép csak akkor lép tovább a naplóban, ha a szerver visszaigazolta az
 adatot, ezért szakadás után sem marad ki és nem duplázódik semmi.
 Kikapcsolás: az ini-ben `[kartyak]` → `kuldes = nem`.
+
+**Mit vett:** a friss (3 napon belüli) költésekhez az ügynök megkeresi a
+nyugtát (ugyanaz a kártya, ugyanaz az összeg, lezárás ±15 percen belül), és
+felküldi a tételeit kategóriával. Csak feltöltős kártyás fizetésnél – a
+kassza máskor nem köti a nyugtát a kártyához.
+
+**Gyakori figyelés:** nyitvatartásban (`[gyors]`, alap 6–21 óra) a
+percenkénti futás nem lép ki azonnal: kb. 50 másodpercig 5 másodpercenként
+ránéz a kártyanaplóra (egy apró lekérdezés), és csak változáskor küld. Egy
+kártyás fizetés így néhány másodpercen belül látszik. Új ütemezett feladat
+nem kell hozzá; két futás sosem fut egyszerre (`jelentes.lock`).
+
+**Gépterhelés:** minden futás méri a gép CPU- és memóriaterhelését, az
+ügynökét (Python + isql) és az InterBase-ét (`ibserver.exe`); a következő
+életjel viszi fel.
 
 Ha az adminban erre a helyszínre ki van jelölve egy újabb kiadás, átadja a
 `frissito.py`-nak. Az telepítés előtt ellenőrzi:

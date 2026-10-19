@@ -19,6 +19,12 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 
 ## Folyamatban
 
+- **Élő kártyamozgások, vásárolt tételek, gépterhelés (2026-10-19.5):**
+  távoli frissítéssel megy fel. A gépterhelés-mérés Windows API-t használ,
+  élesben még nem futott – az első jelentések után ellenőrizni.
+- **Feltöltés / levonás az adminból (tesztkártyán):** a felhőből a gépre
+  menő első utasítás. Döntés kell a védelemről (lásd a beszélgetést).
+
 - **Feltöltős kártyák a felhőben (2026-10-18.1):** a `kartyak.py` csak
   olvasva küldi a `KARTYANAPLO` feltöltős sorait, az egyenlegeket, a neveket
   és a napi egyeztetést; az admin helyszín-oldalán látszik. Élesben:
@@ -39,12 +45,6 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
 - **További helyszínek: RSR és TTK** (itt lehet tesztelni). Félretéve, amíg
   Szentkirályi stabil. Lépések: README, 7. pont.
 
-- **Majdnem élő frissítés a dashboardon** (a végén): a felhasználó pár
-  másodperces frissítést lásson. Az ügynök állandóan futó folyamat legyen,
-  percenkénti őrfeladattal (a Feladatütemező percnél sűrűbben nem indít), és
-  változó ütemben jelentsen: nyitvatartásban 3–5 mp, éjjel 30–60 mp. A
-  `KARTYANAPLO` ID-tartományos lekérdezése elhanyagolható terhelés. A
-  Hostinger kéréskorlátait előtte meg kell nézni.
 - **Vonalkód-teszt a régi USB-s olvasóval.** Telefon maximális fényerőn,
   először Jegyzettömbbe olvasva: beolvassa-e a kijelzőt, és helyesen
   érkeznek-e a `;` és `?` karakterek. Utána a NovoHost VIP-kártyás ablakában

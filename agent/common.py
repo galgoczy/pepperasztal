@@ -26,7 +26,7 @@ import time
 
 # Minden kiadasnal noveld - a scriptek indulaskor kiirjak, igy egy
 # hibajelentesbol azonnal latszik, melyik verzio fut a gepen.
-AGENT_VERSION = "2026-10-19.4"
+AGENT_VERSION = "2026-10-19.5"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INI_PATH = os.path.join(HERE, "pepper_agent.ini")
@@ -77,6 +77,9 @@ class Config(object):
         # Feltoltos kartyak mozgasai a felhobe (kartyak.py). kezdet: ettol a
         # KARTYANAPLO.ID-tol kuld eloszor (0 = a teljes elozmeny).
         self.kartyak = {"kuldes": True, "kezdet": 0, "lap": 300, "nevek": True}
+        # Gyakori ellenorzes nyitvatartasban: a percenkenti feladat ennyi
+        # masodpercenkent nez ra a kartyanaplora, mielott kilep (tol-ig ora).
+        self.gyors = {"be": True, "tol": 6, "ig": 21, "utem": 5}
         self.loaded_from = None
 
     def security_db_path(self):
@@ -161,6 +164,13 @@ def load_config(path=INI_PATH):
             not in ("nem", "no", "false", "0", "off", "ki")
         k["kezdet"] = cfg.getint("kartyak", "kezdet", fallback=0)
         k["lap"] = max(10, min(1000, cfg.getint("kartyak", "lap", fallback=300)))
+    if cfg.has_section("gyors"):
+        g = c.gyors
+        g["be"] = cfg.get("gyors", "be", fallback="igen").strip().lower() \
+            not in ("nem", "no", "false", "0", "off", "ki")
+        g["tol"] = max(0, min(23, cfg.getint("gyors", "tol", fallback=6)))
+        g["ig"] = max(1, min(24, cfg.getint("gyors", "ig", fallback=21)))
+        g["utem"] = max(2, min(30, cfg.getint("gyors", "utem", fallback=5)))
     if cfg.has_section("backup"):
         b = c.backup
         b["mappa"] = cfg.get("backup", "mappa", fallback=b["mappa"]).strip()
@@ -249,6 +259,11 @@ def log(msg):
 # Alfolyamatok
 # ===========================================================================
 
+# A gyermekfolyamatok (isql, gbak) osszesitett CPU-ideje masodpercben - a
+# gepterheles.py ebbol szamolja, mennyi CPU-t vitt el az ugynok.
+GYEREK_CPU = [0.0]
+
+
 def _popen(args, env=None):
     flags = 0
     if os.name == "nt":
@@ -256,6 +271,21 @@ def _popen(args, env=None):
     return subprocess.Popen(
         args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, creationflags=flags, env=env)
+
+
+def _gyerek_cpu(proc):
+    """Egy mar lefutott gyermekfolyamat CPU-ideje (Windows), hibat nem dob."""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        a, b, k, u = (ctypes.c_ulonglong() for _ in range(4))
+        if ctypes.windll.kernel32.GetProcessTimes(
+                ctypes.c_void_p(int(proc._handle)), ctypes.byref(a), ctypes.byref(b),
+                ctypes.byref(k), ctypes.byref(u)):
+            GYEREK_CPU[0] += (k.value + u.value) / 1e7
+    except Exception:
+        pass
 
 
 def _clean_err(err_bytes):
@@ -277,6 +307,7 @@ def run_tool(cfg, exe, args, user_key="sysdba", stdin_text=None):
     proc = _popen([cfg.tool(exe)] + list(args), env=env)
     data = stdin_text.encode("cp1250") if stdin_text is not None else None
     out, err = proc.communicate(input=data)
+    _gyerek_cpu(proc)
     return (proc.returncode, out.decode("cp1250", "replace"),
             _clean_err(err))
 
@@ -299,6 +330,7 @@ def run_isql(cfg, sql, user_key="olvas", commit=False):
     tail = "\nCOMMIT;\nQUIT;\n" if commit else "\nQUIT;\n"
     proc = _popen([cfg.isql])
     out, err = proc.communicate(input=(connect + sql + tail).encode("cp1250"))
+    _gyerek_cpu(proc)
     return out.decode("cp1250", "replace"), _clean_err(err)
 
 

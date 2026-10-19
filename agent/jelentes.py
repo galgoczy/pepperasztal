@@ -19,6 +19,11 @@ Ha a valasz szerint ki van jelolve egy ujabb, alairt kiadas, atadja a
 frissito.py-nak (ami az alairast es a verziot ellenorzi). Parancsot a
 felho nem kuld; a gep csak jelent es frissul.
 
+Gyakori figyeles: nyitvatartasban ([gyors] tol-ig, alap 6-21 ora) a futas
+nem lep ki azonnal, hanem kb. 50 mp-ig 5 mp-enkent ranez a kartyanaplora,
+es csak valtozaskor kuld. Igy egy kartyas fizetes nehany masodpercen belul
+latszik az adminban. Ket futas sosem fut egyszerre (jelentes.lock).
+
 FUTTATAS:
     python jelentes.py              egy jelentes (az utemezett feladat ezt hivja)
     python jelentes.py --proba      egy jelentes, a kuldott adattal es a valasszal
@@ -47,6 +52,9 @@ LOG = os.path.join(HERE, "jelentes_log.txt")
 MENTES = os.path.join(HERE, "mentes_allapot.json")
 FRISSITES = os.path.join(HERE, "frissites_allapot.json")
 UTOLSO = os.path.join(HERE, "jelentes_allapot.json")
+GEP = os.path.join(HERE, "gep_allapot.json")
+ZAR = os.path.join(HERE, "jelentes.lock")
+FUTAS_MP = 50           # a percenkenti futas eddig figyel gyorsan, aztan kilep
 
 
 def read_json(p):
@@ -92,6 +100,8 @@ def payload(cfg):
         "db": db,
         "mentes": read_json(MENTES) or {},
         "frissites": read_json(FRISSITES),
+        # az elozo futas (kb. 1 perc) terhelese - lasd gepterheles.py
+        "gep": read_json(GEP),
     }
     # Feltoltos kartyak mozgasai (kartyak.py). Hiba eseten az eletjel
     # akkor is elmegy, a hiba pedig latszik az adminban.
@@ -177,6 +187,60 @@ def _ini_token_sor(szoveg):
     return None
 
 
+def zarol():
+    """Egyszerre csak egy jelentes-futas. A 2 percnel regebbi zar elavult
+    (pl. aramszunet utan maradt)."""
+    try:
+        if os.path.exists(ZAR) and time.time() - os.path.getmtime(ZAR) < 120:
+            return False
+        with open(ZAR, "w") as f:
+            f.write(str(os.getpid()))
+        return True
+    except OSError:
+        return False
+
+
+def felold():
+    try:
+        os.remove(ZAR)
+    except OSError:
+        pass
+
+
+def gyors_figyeles(cfg, url, token, t0, utolso_gen):
+    """
+    Nyitvatartasban a percenkenti futas nem lep ki azonnal: FUTAS_MP-ig
+    utem masodpercenkent megnezi a kartyanaplo generatorat (egy apro
+    lekerdezes), es csak valtozaskor kuld - a mozgast, az uj egyenleget es
+    a vasarolt teteleket. Uj utemezett feladat nem kell hozza.
+    """
+    g = cfg.gyors
+    ora = int(time.strftime("%H"))
+    if not g["be"] or not cfg.kartyak["kuldes"] or not (g["tol"] <= ora < g["ig"]):
+        return
+    import kartyak
+    while time.time() - t0 + g["utem"] < FUTAS_MP:
+        time.sleep(g["utem"])
+        db = db_proba(cfg)
+        gen = db.get("naplo_gen") if db.get("ok") else None
+        if gen is None or gen == utolso_gen:
+            continue
+        try:
+            ki = kartyak.gyujt(cfg, gen)
+            if not ki:
+                return
+            resp = post(url, token, {
+                "helyszin": cfg.helyszin, "agent_verzio": AGENT_VERSION,
+                "gyors": True, "ido": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "kartyak": ki})
+            kartyak.nyugtaz(ki, resp)
+            if resp.get("ok"):
+                utolso_gen = gen
+        except Exception as e:
+            log("gyors figyeles hiba: {0}".format(str(e)[:200]))
+            return
+
+
 def cmd_titkosit():
     """A token DPAPI-val. Ha az ini [felho] szakaszaban van nyilt 'token ='
     sor, azt titkositja es a helyere irja (nem kell bemasolni semmit);
@@ -240,6 +304,31 @@ def main():
         sys.exit("HIBA: a pepper_agent.ini-ben kell [general] helyszin, es "
                  "[felho] url + token (vagy token_dpapi).")
 
+    if not args.proba and not zarol():
+        return      # elozo futas meg tart - a feladat percenkent ujra indul
+    t0 = time.time()
+    try:
+        import gepterheles
+        meres = gepterheles.Meres()
+    except Exception:
+        meres = None
+    try:
+        kod = futas(cfg, url, token, args, t0)
+    finally:
+        if meres is not None:
+            try:
+                eredm = meres.eredmeny()
+                if eredm:
+                    with open(GEP, "w", encoding="utf-8") as f:
+                        json.dump(eredm, f)
+            except Exception:
+                pass
+        if not args.proba:
+            felold()
+    sys.exit(kod)
+
+
+def futas(cfg, url, token, args, t0):
     data = payload(cfg)
     if args.proba:
         print(json.dumps(data, ensure_ascii=False, indent=2))
@@ -277,8 +366,12 @@ def main():
         log("Frissites: " + eredmeny)
         if args.proba:
             print("Frissites:", eredmeny)
+        return 0 if resp.get("ok") else 1   # uj kod: a kovetkezo futas figyel
 
-    sys.exit(0 if resp.get("ok") else 1)
+    if resp.get("ok") and not args.proba:
+        db = data.get("db") or {}
+        gyors_figyeles(cfg, url, token, t0, db.get("naplo_gen"))
+    return 0 if resp.get("ok") else 1
 
 
 if __name__ == "__main__":

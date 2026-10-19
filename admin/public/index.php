@@ -87,9 +87,9 @@ Az oldal 30 másodpercenként frissül.</p>
 
 <div class="card scroll"><table>
 <tr><th>Helyszín</th><th>Életjel</th><th>Ügynök</th><th>Adatbázis</th>
-    <th>Éjszakai mentés</th><th>Napközbeni</th></tr>
+    <th>Gép</th><th>Éjszakai mentés</th><th>Napközbeni</th></tr>
 <?php if (!$rows): ?>
-<tr><td colspan="6" class="muted">Még nincs helyszín. Lent vehetsz fel újat.</td></tr>
+<tr><td colspan="7" class="muted">Még nincs helyszín. Lent vehetsz fel újat.</td></tr>
 <?php endif; ?>
 <?php foreach ($rows as $r):
     $a = pa_json($r['adat']);
@@ -111,6 +111,11 @@ Az oldal 30 másodpercenként frissül.</p>
   <td class="<?= !$r['ido'] ? 'muted' : (!empty($dbs['ok']) ? 'ok' : 'bad') ?>">
       <?= !$r['ido'] ? '–' : (!empty($dbs['ok']) ? 'elérhető' : 'HIBA') ?>
       <?php if (isset($dbs['naplo_gen'])): ?><div class="muted">napló #<?= (int)$dbs['naplo_gen'] ?></div><?php endif; ?></td>
+  <?php $g = is_array($a['gep'] ?? null) ? $a['gep'] : []; ?>
+  <td><?php if (isset($g['cpu_rendszer'])): ?>
+      CPU <?= h((string)$g['cpu_rendszer']) ?>% · mem <?= h((string)($g['mem_terheles'] ?? '–')) ?>%
+      <div class="muted">ügynök <?= h((string)($g['sajat_cpu'] ?? '–')) ?>%<?= isset($g['ib_cpu']) ? ' · IB ' . h((string)$g['ib_cpu']) . '%' : '' ?></div>
+      <?php else: ?><span class="muted">–</span><?php endif; ?></td>
   <td class="<?= $r['ido'] ? $ej : 'muted' ?>"><?= h(pa_ago($m['utolso_mentes'] ?? null)) ?>
       <?php if (!empty($m['archiv_meret_mb'])): ?><div class="muted"><?= h((string)$m['archiv_meret_mb']) ?> MB</div><?php endif; ?>
       <?php if (!empty($m['utolso_hiba'])): ?><div class="bad">hiba: <?= h(mb_substr((string)$m['utolso_hiba'], 0, 80)) ?></div><?php endif; ?></td>

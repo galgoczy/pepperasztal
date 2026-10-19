@@ -18,6 +18,10 @@ A feltoltos kartyak neve a pillanatkeppel megy fel (a szerver titkositva
 tarolja, az adminban alapbol csillagozva latszik). Kikapcsolhato:
 [kartyak] nevek = nem - ekkor a szerver a mar tarolt neveket is torli.
 
+  - vasarlasok: a friss (3 napon beluli) koltesekhez a nyugta tetelei
+    (termeknev, mennyiseg, ertek, kategoria). Parositas: kartya + osszeg +
+    a nyugta lezarasa +-15 percen belul. Csak feltoltos kartyas fizetes.
+
 Amit NEM kuld: kartyakodot, tulajdonos-adatot, szemelyzeti kartyat.
 
 Kurzor: a gep csak akkor lep tovabb, ha a szerver visszaigazolta, hogy
@@ -128,6 +132,121 @@ def egyeztetes(cfg):
             "naplo_nelkul": nincs, "elteres": elteres[:200]}
 
 
+VASARLAS_NAP = 3            # ennel regebbi koltesnel nem keresunk nyugtat
+VASARLAS_ABLAK = 3000       # az utolso ennyi nyugtaban keresunk
+VASARLAS_PROBA = 5          # ennyiszer probaljuk parositani, utana feladjuk
+VASARLAS_PERC = 15          # nyugta lezarasa es naplosor kozti max. elteres
+
+
+def _epoch(s):
+    try:
+        return time.mktime(time.strptime((s or "")[:19], "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        return None
+
+
+def _in_lista(szamok):
+    return ", ".join(str(int(x)) for x in sorted(set(szamok)))
+
+
+def vasarlasok(cfg, koltesek, foglalt):
+    """
+    Koltes (FK naplosor) -> a nyugta tetelei. Parositas: ugyanaz a kartya,
+    a VIP-fizetes osszege = a koltes, a nyugta lezarasa +-15 percen belul;
+    tobb jelolt kozul az idoben legkozelebbi, meg fel nem hasznalt.
+    Visszaad: (talalatok, parositatlan naplo-ID-k).
+    """
+    if not koltesek:
+        return [], []
+    mx = _rows(cfg, "SELECT MAX(F.ID) AS M FROM NYUGTAFEJ F;", ["M"])
+    if not mx or not mx[0].get("M"):
+        return [], [k["id"] for k in koltesek]
+    lo = max(0, int(mx[0]["M"]) - VASARLAS_ABLAK)
+    fiz = _rows(cfg, (
+        "SELECT N.FEJ AS FEJ, N.KKODID AS K, N.FORINT AS F, N.LEZARVA AS L "
+        "FROM NYUGTAFIZETES N JOIN KARTYATORZS KT ON KT.ID = N.KKODID WHERE "
+        "N.FEJ > {0} AND N.FIZTIPID = 10 AND N.FIZTIP = 'FIZ' AND "
+        "KT.TIPUS = 1;").format(lo), ["FEJ", "K", "F", "L"])
+    jeloltek = {}
+    for r in fiz:
+        if not r.get("FEJ") or not r.get("K"):
+            continue
+        jeloltek.setdefault(int(r["K"]), []).append(
+            (int(r["FEJ"]), float(r.get("F") or 0), _epoch(r.get("L"))))
+
+    par, nincs = {}, []
+    hasznalt = set(foglalt)
+    for k in sorted(koltesek, key=lambda x: x["id"]):
+        osszeg = -float(k["osszeg"] or 0)
+        t = _epoch(k["ido"])
+        legjobb = None
+        for fej, forint, lz in jeloltek.get(k["kartya"], []):
+            if fej in hasznalt or abs(forint - osszeg) > 0.005:
+                continue
+            d = abs(lz - t) if (lz is not None and t is not None) else 0
+            if d <= VASARLAS_PERC * 60 and (legjobb is None or d < legjobb[1]):
+                legjobb = (fej, d)
+        if legjobb:
+            par[k["id"]] = legjobb[0]
+            hasznalt.add(legjobb[0])
+        else:
+            nincs.append(k["id"])
+    if not par:
+        return [], nincs
+
+    fejek = _in_lista(par.values())
+    tetelek = _rows(cfg, (
+        "SELECT T.FEJ AS FEJ, T.NEV AS N, T.MENNYISEG AS M, T.VEGERTEK AS V, "
+        "T.EAZO AS E FROM NYUGTATETEL T WHERE T.FEJ IN ({0});").format(fejek),
+        ["FEJ", "N", "M", "V", "E"])
+    vegertek = dict((int(r["ID"]), _num(r.get("V"))) for r in _rows(cfg, (
+        "SELECT F.ID AS ID, F.VEGERTEK AS V FROM NYUGTAFEJ F WHERE F.ID IN "
+        "({0});").format(fejek), ["ID", "V"]) if r.get("ID"))
+    eazok = [int(r["E"]) for r in tetelek if (r.get("E") or "").strip().lstrip("-").isdigit()]
+    kat = {}
+    if eazok:
+        tip = dict((int(r["ID"]), int(r["T"])) for r in _rows(cfg, (
+            "SELECT E.ID AS ID, E.TIPUS AS T FROM ETELFAJ E WHERE E.ID IN "
+            "({0});").format(_in_lista(eazok)), ["ID", "T"])
+            if r.get("ID") and r.get("T"))
+        nevek = dict((int(r["ID"]), (r.get("N") or "").strip()) for r in _rows(
+            cfg, "SELECT T.ID AS ID, T.NEV AS N FROM ETELTIP T;", ["ID", "N"])
+            if r.get("ID"))
+        for e, t in tip.items():
+            kat[e] = (t, nevek.get(t, ""))
+
+    per_fej = {}
+    for r in tetelek:
+        e = int(r["E"]) if (r.get("E") or "").strip().lstrip("-").isdigit() else None
+        kt = kat.get(e, (None, ""))
+        per_fej.setdefault(int(r["FEJ"]), []).append({
+            "nev": " ".join((r.get("N") or "").split())[:60],
+            "menny": round(float(r.get("M") or 0), 3),
+            "ertek": _num(r.get("V")), "kat_id": kt[0], "kat": kt[1][:40]})
+    ki = []
+    kmap = dict((k["id"], k) for k in koltesek)
+    for nid, fej in sorted(par.items()):
+        k = kmap[nid]
+        ki.append({"naplo_id": nid, "nyugta": fej, "kartya": k["kartya"],
+                   "ido": k["ido"], "osszeg": _num(-float(k["osszeg"] or 0)),
+                   "vegertek": vegertek.get(fej), "tetelek": per_fej.get(fej, [])[:100]})
+    return ki, nincs
+
+
+def _vasarlas_jeloltek(st, sorok):
+    """Uj, friss koltesek + a korabban parositatlanok (proba-szamlaloval)."""
+    kesz = set(st.get("vas_kesz", []))
+    var = st.get("vas_var", {})
+    hatar = time.time() - VASARLAS_NAP * 86400
+    for r in sorok:
+        if (r["tipus"] == "FK" and r["id"] not in kesz and str(r["id"]) not in var
+                and (_epoch(r["ido"]) or 0) >= hatar):
+            var[str(r["id"])] = {"kartya": r["kartya"], "osszeg": r["osszeg"],
+                                 "ido": r["ido"], "proba": 0}
+    st["vas_var"] = var
+    return [dict(v, id=int(k)) for k, v in var.items()]
+
+
 def gyujt(cfg, naplo_gen):
     """A jelentesbe kerulo resz. naplo_gen: GEN_ID(GEN_KARTYANAPLO, 0)."""
     if not cfg.kartyak["kuldes"]:
@@ -153,6 +272,21 @@ def gyujt(cfg, naplo_gen):
         tol = max(0, kurzor - VISSZA)
         ig = min(naplo_gen, kurzor + cfg.kartyak["lap"])
         ki["naplo"] = {"tol": tol, "ig": ig, "sorok": naplo_sorok(cfg, tol, ig)}
+
+    # Mit vett? A friss koltesekhez a nyugta tetelei (a parositatlanokat a
+    # kovetkezo futasok ujraprobaljak, VASARLAS_PROBA-szor).
+    jeloltek = _vasarlas_jeloltek(st, ki.get("naplo", {}).get("sorok", []))
+    if jeloltek:
+        talalt, nincs = vasarlasok(cfg, jeloltek, st.get("vas_nyugtak", []))
+        if talalt:
+            ki["vasarlasok"] = talalt
+        for nid in nincs:
+            v = st["vas_var"].get(str(nid))
+            if v is not None:
+                v["proba"] = v.get("proba", 0) + 1
+                if v["proba"] >= VASARLAS_PROBA:
+                    del st["vas_var"][str(nid)]
+        _ment(st)
 
     if (st.get("pillanat_gen") != naplo_gen
             or most - st.get("pillanat_ido", 0) > PILLANAT_PERC * 60):
@@ -184,4 +318,15 @@ def nyugtaz(ki, resp):
         st["pillanat_ido"] = time.time()
     if ki.get("egyeztetes") is not None and resp.get("egyeztetes_ok"):
         st["egyeztetes_nap"] = ki["egyeztetes"]["ido"][:10]
+    ok = set(resp.get("vasarlas_ok") or [])
+    if ok:
+        kesz = st.get("vas_kesz", [])
+        nyugtak = st.get("vas_nyugtak", [])
+        for v in ki.get("vasarlasok", []):
+            if v["naplo_id"] in ok:
+                kesz.append(v["naplo_id"])
+                nyugtak.append(v["nyugta"])
+                st.get("vas_var", {}).pop(str(v["naplo_id"]), None)
+        st["vas_kesz"] = kesz[-2000:]
+        st["vas_nyugtak"] = nyugtak[-2000:]
     _ment(st)

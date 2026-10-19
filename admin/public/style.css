@@ -43,3 +43,4 @@ pre { white-space:pre-wrap; word-break:break-all; margin:0; padding:14px; font-s
 .stack { display:grid; gap:10px; margin-bottom:16px; }
 a.btn { display:block; text-align:center; text-decoration:none; font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); }
 a.btn.primary { background:var(--red); border-color:var(--red); color:#fff; }
+.small { font-size:12px; }

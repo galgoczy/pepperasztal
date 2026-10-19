@@ -12,6 +12,7 @@
  * Valasz: { ok, szerver_ido, frissites: null | { verzio, sha256 },
  *           naplo_ig?, pillanatkep_ok?, egyeztetes_ok? }
  * A kartyak resze (feltoltos kartyak mozgasai): lib/kartyak.php.
+ * "gyors": true - percen beluli kartyajelentes, csak a kartyaadatot menti.
  * A frissitest a gep csak akkor kapja meg, ha az adminban erre a
  * helyszinre ki lett jelolve (cel_verzio), es van ilyen alairt kiadas.
  * PARANCSOT a felho nem kuld - a kommunikacio egyiranyu.
@@ -79,6 +80,15 @@ try {
                   'pillanatkep' => isset($k['pillanatkep']), 'egyeztetes' => isset($k['egyeztetes']),
                   'hiba' => $k['hiba'] ?? ($valasz['kartyak_hiba'] ?? null)];
         $in['kartyak'] = $kinfo;
+    }
+
+    // Gyors jelentes (csak kartyamozgas, percen beluli): az eletjel-sort nem
+    // irja felul, igy a mentes- es gepadatok a percenkenti jelentesbol maradnak.
+    if (!empty($in['gyors'])) {
+        pa_hely_set((int)$site['id'], 'gyors_ido', pa_now());
+        echo json_encode(['ok' => true, 'szerver_ido' => pa_now(), 'frissites' => null] + $valasz,
+            JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     $ver = substr((string)($in['agent_verzio'] ?? ''), 0, 32);

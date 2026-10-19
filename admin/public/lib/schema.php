@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-const PA_SCHEMA_VERSION = 4;
+const PA_SCHEMA_VERSION = 5;
 
 function pa_is_sqlite(): bool
 {
@@ -98,6 +98,17 @@ function pa_migrate(): void
         v MEDIUMTEXT NULL,
         ido VARCHAR(19) NOT NULL,
         PRIMARY KEY (helyszin_id, k))$tail");
+    // 5: mit vett - a koltes (FK naplosor) nyugtajanak tetelei JSON-ban
+    $db->exec("CREATE TABLE IF NOT EXISTS kartyavasarlas (
+        helyszin_id INT NOT NULL,
+        naplo_id INT NOT NULL,
+        nyugta_id INT NOT NULL,
+        kartya_id INT NOT NULL,
+        ido VARCHAR(19) NULL,
+        osszeg DECIMAL(14,2) NULL,
+        vegertek DECIMAL(14,2) NULL,
+        tetelek MEDIUMTEXT NULL,
+        PRIMARY KEY (helyszin_id, naplo_id))$tail");
     // 4: a kartya neve titkositva (lib/titok.php)
     try {
         $db->exec('ALTER TABLE kartya ADD COLUMN nev_titkos TEXT NULL');

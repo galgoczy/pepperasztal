@@ -63,6 +63,15 @@ kuldes = igen
 nevek = igen
 kezdet = 0
 
+[gyors]
+; Nyitvatartasban (tol-ig ora) a percenkenti futas utem mp-enkent ranez a
+; kartyanaplora, es egy kartyas fizetes nehany mp-en belul latszik az
+; adminban. be = nem -> csak percenkent.
+be = igen
+tol = 6
+ig = 21
+utem = 5
+
 [backup]
 ; Helyi mentesek. NE a Program Files ala (VirtualStore-csapda).
 ; A pontos meretet (DB / gbk / archivum) az elso futas naploja kiirja.

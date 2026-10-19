@@ -17,6 +17,11 @@ A POS gépek ügynökeinek felhős oldala a Hostingeren (PHP + MySQL). Az
   látszik. Kapcsolóval kezdőbetűs vagy teljes nézetre lehet váltani; a
   teljes nézet 15 percig tart, és bekerül az eseménynaplóba. Kártyakód nem
   jön fel.
+- **Élő kártyamozgások:** nyitvatartásban egy kártyás fizetés a vásárolt
+  tételekkel néhány másodpercen belül látszik a helyszín oldalán (az oldal
+  10 másodpercenként frissül).
+- **Gépterhelés:** CPU és memória a gépen, külön az ügynöké és az
+  InterBase-é – a kezdőlapon és a helyszín oldalán.
 - **Tokenek:** helyszínenként egy token. Felvételkor és cserekor egyszer
   látszik, a szerveren csak a hash-e marad meg. Egy gombbal cserélhető vagy
   visszavonható.

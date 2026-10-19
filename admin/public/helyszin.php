@@ -53,7 +53,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             pa_audit($user, 'atnevezve', $s['kulcs'] . ' -> ' . $nev);
         }
     } elseif ($mit === 'torles' && ($_POST['megerosit'] ?? '') === $s['kulcs']) {
-        foreach (['jelentes', 'kartya', 'kartyamozgas', 'helyszin_allapot'] as $t) {
+        foreach (['jelentes', 'kartya', 'kartyamozgas', 'kartyavasarlas', 'helyszin_allapot'] as $t) {
             $db->prepare("DELETE FROM $t WHERE helyszin_id = ?")->execute([$id]);
         }
         $db->prepare('DELETE FROM helyszin WHERE id = ?')->execute([$id]);
@@ -66,7 +66,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 $a = pa_json($s['adat']);
 $m = $a['mentes'] ?? [];
-pa_page_start($s['nev'], $user);
+pa_page_start($s['nev'], $user, 10);
 pa_show_flash();
 ?>
 <h1><?= h($s['nev']) ?> <span class="chip mono"><?= h($s['kulcs']) ?></span></h1>
@@ -91,6 +91,17 @@ pa_show_flash();
 <?php if (!empty($a['frissites'])): ?>
 <tr><th>Utolsó frissítési kísérlet</th><td><?= h(($a['frissites']['ido'] ?? '') . ' – ' . ($a['frissites']['eredmeny'] ?? '')) ?></td></tr>
 <?php endif; ?>
+<?php $g = is_array($a['gep'] ?? null) ? $a['gep'] : []; ?>
+<tr><th>Gép terhelése</th><td><?php if ($g && !isset($g['hiba'])): ?>
+  CPU <?= h((string)($g['cpu_rendszer'] ?? '–')) ?>% · memória <?= h((string)($g['mem_terheles'] ?? '–')) ?>%
+  (szabad <?= h(number_format((int)($g['mem_szabad_mb'] ?? 0), 0, ',', ' ')) ?> MB)
+  <br><span class="muted">Ügynök: CPU <?= h((string)($g['sajat_cpu'] ?? '–')) ?>%
+  (<?= h((string)($g['sajat_cpu_mp'] ?? '–')) ?> mp / <?= h((string)($g['ido_mp'] ?? '–')) ?> mp),
+  memória <?= h((string)($g['sajat_mem_mb'] ?? '–')) ?> MB
+  <?php if (isset($g['ib_cpu'])): ?> · InterBase: CPU <?= h((string)$g['ib_cpu']) ?>%, memória <?= h((string)($g['ib_mem_mb'] ?? '–')) ?> MB<?php endif; ?>
+  · <?= h((string)($g['ido'] ?? '')) ?></span>
+<?php elseif ($g): ?><span class="bad"><?= h((string)$g['hiba']) ?></span>
+<?php else: ?><span class="muted">nincs adat (ügynök 2026-10-19.5 vagy újabb kell)</span><?php endif; ?></td></tr>
 <tr><th>Adatbázis</th><td><?= !empty($a['db']['ok']) ? '<span class="ok">elérhető</span>' : '<span class="bad">' . h($a['db']['hiba'] ?? 'nincs adat') . '</span>' ?></td></tr>
 <tr><th>Éjszakai mentés</th><td><?= h(($m['utolso_mentes'] ?? '–') . (isset($m['archiv_meret_mb']) ? ' · ' . $m['archiv_meret_mb'] . ' MB' : '')) ?></td></tr>
 <tr><th>Napközbeni mentés</th><td><?= h($m['utolso_napkozbeni'] ?? '–') ?>
@@ -120,7 +131,9 @@ $kst = $db->prepare('SELECT k.*, (SELECT COUNT(*) FROM kartyamozgas m WHERE m.he
                      ORDER BY k.utolso_mozgas DESC, k.kartya_id');
 $kst->execute([$id]);
 $kartyak = $kst->fetchAll();
-$mst = $db->prepare('SELECT * FROM kartyamozgas WHERE helyszin_id = ? ORDER BY naplo_id DESC LIMIT 30');
+$mst = $db->prepare('SELECT m.*, v.tetelek FROM kartyamozgas m LEFT JOIN kartyavasarlas v
+                     ON v.helyszin_id = m.helyszin_id AND v.naplo_id = m.naplo_id
+                     WHERE m.helyszin_id = ? ORDER BY m.naplo_id DESC LIMIT 30');
 $mst->execute([$id]);
 $mozgasok = $mst->fetchAll();
 ?>
@@ -190,7 +203,7 @@ A kulcs csak a szerveren legyen; ha elveszik, a gépek a neveket újra felküldi
 <div class="card scroll"><table>
 <?php $nevek_map = [];
 foreach ($kartyak as $k) { $nevek_map[(int)$k['kartya_id']] = $k['nev_titkos']; } ?>
-<tr><th>Idő</th><th>Kártya-ID</th><?= $van_nev ? '<th>Név</th>' : '' ?><th>Mozgás</th><th class="num">Összeg</th><th class="num">Utána</th></tr>
+<tr><th>Idő</th><th>Kártya-ID</th><?= $van_nev ? '<th>Név</th>' : '' ?><th>Mozgás</th><th class="num">Összeg</th><th class="num">Utána</th><th>Mit vett</th></tr>
 <?php foreach ($mozgasok as $mz): ?>
 <tr>
   <td><?= h($mz['ido'] ?? '–') ?></td>
@@ -199,6 +212,7 @@ foreach ($kartyak as $k) { $nevek_map[(int)$k['kartya_id']] = $k['nev_titkos']; 
   <td><?= h(PA_KTIPUS[$mz['tipus']] ?? $mz['tipus']) ?></td>
   <td class="num"><?= h(number_format((float)$mz['osszeg'], 0, ',', ' ')) ?></td>
   <td class="num"><?= h(number_format((float)$mz['elotte'] + (float)$mz['osszeg'], 0, ',', ' ')) ?></td>
+  <td class="small"><?= h(pa_tetelek_szoveg($mz['tetelek'] ?? null)) ?></td>
 </tr>
 <?php endforeach; ?>
 </table></div>

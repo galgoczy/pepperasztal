@@ -7,6 +7,8 @@
  *                (a nev titkositva kerul az adatbazisba; nevek = false eseten
  *                a helyszin minden tarolt nevet toroljuk)
  *   egyeztetes:  { ido, kartyak, naplo_nelkul, elteres: [...] }
+ *   vasarlasok:  [{ naplo_id, nyugta, kartya, ido, osszeg, vegertek,
+ *                   tetelek: [{nev, menny, ertek, kat_id, kat}] }]
  *
  * A mozgasok (helyszin, naplo-ID) szerint egyediek: az ujrakuldott sorok
  * nem duplazodnak. A valasz visszaigazolja, mit mentettunk - a gep csak
@@ -158,6 +160,17 @@ function pa_kartyak_fogad(int $hid, array $k): array
         $ki['egyeztetes_ok'] = true;
     }
 
+    if (isset($k['vasarlasok']) && is_array($k['vasarlasok'])) {
+        // Kulon kezelve: egy hibas vasarlas ne tartsa vissza a naplo
+        // visszaigazolasat (a gep akkor ujra kuldene mindent).
+        try {
+            $ki['vasarlas_ok'] = pa_vasarlasok_fogad($hid, $k['vasarlasok']);
+            $info['vasarlas'] = count($ki['vasarlas_ok']);
+        } catch (InvalidArgumentException $e) {
+            $info['vasarlas_hiba'] = $e->getMessage();
+        }
+    }
+
     pa_hely_set($hid, 'kartya_info', json_encode($info));
     return $ki;
 }
@@ -253,4 +266,65 @@ function pa_nev_mutat(?string $titkos, int $hid, int $kid, string $mod): string
     return implode(' ', array_map(function ($w) {
         return mb_substr($w, 0, 1) . '***';
     }, $szavak));
+}
+
+/** A vasarlasok mentese; visszaadja a mentett (vagy mar meglevo) naplo-ID-ket. */
+function pa_vasarlasok_fogad(int $hid, array $lista): array
+{
+    if (count($lista) > 500) {
+        throw new InvalidArgumentException('tul sok vasarlas');
+    }
+    $db = pa_db();
+    $ins = $db->prepare(pa_beszur_ignore() . ' INTO kartyavasarlas
+        (helyszin_id, naplo_id, nyugta_id, kartya_id, ido, osszeg, vegertek, tetelek)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    $ok = [];
+    $db->beginTransaction();
+    try {
+        foreach ($lista as $v) {
+            $nid = (int)($v['naplo_id'] ?? 0);
+            $fej = (int)($v['nyugta'] ?? 0);
+            $kid = (int)($v['kartya'] ?? 0);
+            if ($nid <= 0 || $fej <= 0 || $kid <= 0 || !is_array($v['tetelek'] ?? null)) {
+                throw new InvalidArgumentException('hibas vasarlas');
+            }
+            $tetelek = [];
+            foreach (array_slice($v['tetelek'], 0, 100) as $t) {
+                $tetelek[] = [
+                    'nev' => mb_substr((string)($t['nev'] ?? ''), 0, 60),
+                    'menny' => round((float)($t['menny'] ?? 0), 3),
+                    'ertek' => pa_penz($t['ertek'] ?? null),
+                    'kat_id' => isset($t['kat_id']) ? (int)$t['kat_id'] : null,
+                    'kat' => mb_substr((string)($t['kat'] ?? ''), 0, 40),
+                ];
+            }
+            $ins->execute([$hid, $nid, $fej, $kid, pa_ido_ok($v['ido'] ?? ''),
+                           pa_penz($v['osszeg'] ?? null), pa_penz($v['vegertek'] ?? null),
+                           json_encode($tetelek, JSON_UNESCAPED_UNICODE)]);
+            $ok[] = $nid;
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+    return $ok;
+}
+
+/** "1x Napi Menü, 2x Cappuccino" - a 0 erteku menu-osszetevok nelkul. */
+function pa_tetelek_szoveg(?string $json): string
+{
+    $t = json_decode((string)$json, true);
+    if (!is_array($t)) {
+        return '';
+    }
+    $ki = [];
+    foreach ($t as $x) {
+        if ((float)($x['ertek'] ?? 0) == 0.0 && count($t) > 1) {
+            continue;
+        }
+        $m = (float)($x['menny'] ?? 1);
+        $ki[] = ($m == (int)$m ? (int)$m : $m) . '× ' . ($x['nev'] ?? '');
+    }
+    return implode(', ', $ki);
 }
