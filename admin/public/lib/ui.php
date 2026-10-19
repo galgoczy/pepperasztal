@@ -52,6 +52,7 @@ function pa_page_start(string $title, ?string $user, int $refresh = 0): void
     <a href="/">Helyszínek</a>
     <a href="/naplo.php">Napló</a>
     <a href="/passkey.php">Passkeyek</a>
+    <a href="/vonalkod.php">Vonalkód</a>
     <form method="post" action="/kilepes.php"><?= pa_csrf_field() ?><button class="link"><?= h($user) ?> · Kilépés</button></form>
   </nav>
 <?php endif; ?>
