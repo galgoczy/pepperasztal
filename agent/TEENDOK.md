@@ -60,6 +60,11 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   tesztkártyát használjuk. Ahol vonalkód-olvasó van, bármelyik kártya
   kódjából készült vonalkóddal lehet fizetni – a kódok megjelenítése ezért
   naplózott.
+- **Kódforma (Szentkirályi, helyszíni ellenőrzés):** `;XXXÉÉÉÉHHNN?` –
+  3 jegyű sorszám + egy dátum, amely egy adagon belül a legtöbb kártyán
+  azonos. Minta Géza (610): `;00000000001?`. Saját kiosztásnál ettől jól
+  elkülönülő tartomány kell (pl. saját „dátum”-blokk), hogy ne ütközzön a
+  NovoHost-kártyákkal; a többi helyszín formája még ellenőrizendő.
 - **Vonalkód-teszt a régi USB-s olvasóval.** Telefon maximális fényerőn,
   először Jegyzettömbbe olvasva: beolvassa-e a kijelzőt, és helyesen
   érkeznek-e a `;` és `?` karakterek. Utána a NovoHost VIP-kártyás ablakában
