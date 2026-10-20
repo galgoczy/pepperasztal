@@ -181,8 +181,8 @@ function pa_kartyak_fogad(int $hid, array $k): array
         try {
             $ki['vasarlas_ok'] = pa_vasarlasok_fogad($hid, $k['vasarlasok']);
             $info['vasarlas'] = count($ki['vasarlas_ok']);
-        } catch (InvalidArgumentException $e) {
-            $info['vasarlas_hiba'] = $e->getMessage();
+        } catch (Throwable $e) {
+            $info['vasarlas_hiba'] = mb_substr($e->getMessage(), 0, 200);
         }
     }
 
@@ -190,10 +190,20 @@ function pa_kartyak_fogad(int $hid, array $k): array
         $a = $k['azonositasok'];
         $ig = (int)($a['ig'] ?? -1);
         if ($ig < 0 || !is_array($a['lista'] ?? null) || count($a['lista']) > 500) {
-            throw new InvalidArgumentException('hibas azonositas-resz');
+            $a = ['lista' => []];
+            $ig = -1;
+            $info['azonositas_hiba'] = 'hibas azonositas-resz';
         }
-        $info['azonositas'] = pa_azonositasok_fogad($hid, $a['lista']);
-        $ki['azonositas_ig'] = $ig;
+        // Kulon kezelve, mint a vasarlasok: ne tartsa vissza a naplot.
+        try {
+            $info['azonositas'] = pa_azonositasok_fogad($hid, $a['lista']);
+            $ki['azonositas_ig'] = $ig;
+        } catch (Throwable $e) {
+            $info['azonositas_hiba'] = mb_substr($e->getMessage(), 0, 200);
+        }
+    }
+    if (isset($k['azonositas_hiba'])) {
+        $info['azonositas_hiba'] = 'gep: ' . mb_substr((string)$k['azonositas_hiba'], 0, 200);
     }
 
     pa_hely_set($hid, 'kartya_info', json_encode($info));

@@ -174,14 +174,17 @@ foreach ($kartyak as $k) { $nevek_map[(int)$k['kartya_id']] = $k['nev_titkos']; 
 $nmod = pa_nev_mod();
 $van_nev = (bool)array_filter($kartyak, function ($k) { return $k['nev_titkos'] !== null; });
 ?>
-<p class="sub">Kártya-ID a helyszín NovoHostjában. A név titkosítva van tárolva, a kártyakód nem jön fel.
+<p class="sub">Kártya-ID a helyszín NovoHostjában. A név és a kártyakód titkosítva van tárolva.
 <?php if ($kinfo): ?>
   Napló: <?= (int)($kinfo['kurzor'] ?? 0) ?> / <?= h((string)($kinfo['gen'] ?? '?')) ?> sor-ID
   <?php if (isset($kinfo['gen'], $kinfo['kurzor']) && $kinfo['gen'] > $kinfo['kurzor']): ?>
     <span class="warn">· előzmény feltöltése folyamatban</span><?php endif; ?>
   <?php if (!empty($kinfo['pillanatkep'])): ?> · egyenlegek: <?= h((string)$kinfo['pillanatkep']) ?><?php endif; ?>
 <?php else: ?>A gép még nem küldött kártyaadatot (ügynök 2026-10-17.9 vagy újabb kell).<?php endif; ?>
-<?php if (!empty($kinfo['hiba'])): ?><br><span class="bad">Hiba a gépen: <?= h((string)$kinfo['hiba']) ?></span><?php endif; ?></p>
+<?php if (!empty($kinfo['hiba'])): ?><br><span class="bad">Hiba a gépen: <?= h((string)$kinfo['hiba']) ?></span><?php endif; ?>
+<?php foreach (['szerver_hiba' => 'Hiba a szerveren', 'vasarlas_hiba' => 'Vásárolt tételek', 'azonositas_hiba' => 'Azonosítások'] as $hk => $hc): ?>
+<?php if (!empty($kinfo[$hk])): ?><br><span class="bad"><?= h($hc) ?>: <?= h((string)$kinfo[$hk]) ?></span><?php endif; ?>
+<?php endforeach; ?></p>
 
 <?php if ($egyd): ?>
 <p>Napi egyeztetés (<?= h($egyd['ido'] ?? '') ?>): <?= (int)($egyd['kartyak'] ?? 0) ?> kártya,

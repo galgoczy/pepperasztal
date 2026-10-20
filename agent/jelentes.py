@@ -247,7 +247,10 @@ def gyors_figyeles(cfg, url, token, t0, utolso_gen):
         try:
             gen, uj_fej = kartyak.figyel(cfg, fej)
         except Exception:
-            gen, uj_fej = None, None
+            # Ha az uj lekerdezes nem megy, a regi (csak generator) figyeles
+            # meg mukodjon.
+            db = db_proba(cfg)
+            gen, uj_fej = (db.get("naplo_gen") if db.get("ok") else None), None
         if gen is None or (gen == utolso_gen and uj_fej is None):
             continue
         try:

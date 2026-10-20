@@ -381,13 +381,17 @@ def gyujt(cfg, naplo_gen, uj_fej=None):
         ki["egyeztetes"] = egyeztetes(cfg)
 
     # Kartya csak azonositasra (0 Ft-os VIP-sor) - csak ha van uj nyugta.
-    kurzor = fej_kurzor(cfg)
-    if kurzor is not None:
-        mx = uj_fej
-        if mx is None:
-            mx = figyel(cfg, kurzor)[1]
-        if mx is not None and mx > kurzor:
-            ki["azonositasok"] = azonositasok(cfg, kurzor, mx)
+    # Kulon hibakezeles: egy itteni hiba ne tartsa vissza a naplot.
+    try:
+        kurzor = fej_kurzor(cfg)
+        if kurzor is not None:
+            mx = uj_fej
+            if mx is None:
+                mx = figyel(cfg, kurzor)[1]
+            if mx is not None and mx > kurzor:
+                ki["azonositasok"] = azonositasok(cfg, kurzor, mx)
+    except Exception as e:
+        ki["azonositas_hiba"] = str(e)[:200]
     return ki
 
 

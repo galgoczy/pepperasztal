@@ -78,9 +78,16 @@ try {
     if (isset($in['kartyak']) && is_array($in['kartyak'])) {
         try {
             $valasz += pa_kartyak_fogad((int)$site['id'], $in['kartyak']);
-        } catch (InvalidArgumentException $e) {
-            // Hibas kartya-resz: az eletjel megmarad, a gep nem lep tovabb.
-            $valasz['kartyak_hiba'] = $e->getMessage();
+        } catch (Throwable $e) {
+            // Hibas kartya-resz (vagy adatbazis-hiba): az eletjel megmarad,
+            // a gep nem lep tovabb, a hiba latszik az adminban.
+            $valasz['kartyak_hiba'] = mb_substr($e->getMessage(), 0, 200);
+            if (!($e instanceof InvalidArgumentException)) {
+                error_log('pepperadmin kartyak: ' . $e->getMessage());
+            }
+            $ki0 = json_decode((string)(pa_hely_get((int)$site['id'], 'kartya_info')['v'] ?? ''), true) ?: [];
+            $ki0['szerver_hiba'] = pa_now() . ' ' . $valasz['kartyak_hiba'];
+            pa_hely_set((int)$site['id'], 'kartya_info', json_encode($ki0));
         }
         // A nyers jelentesbe csak az osszegzes kerul, a mozgasok nem.
         $k = $in['kartyak'];
