@@ -77,16 +77,17 @@ try {
     }
     if (isset($in['kartyak']) && is_array($in['kartyak'])) {
         try {
-            $valasz = pa_kartyak_fogad((int)$site['id'], $in['kartyak']);
+            $valasz += pa_kartyak_fogad((int)$site['id'], $in['kartyak']);
         } catch (InvalidArgumentException $e) {
             // Hibas kartya-resz: az eletjel megmarad, a gep nem lep tovabb.
-            $valasz = ['kartyak_hiba' => $e->getMessage()];
+            $valasz['kartyak_hiba'] = $e->getMessage();
         }
         // A nyers jelentesbe csak az osszegzes kerul, a mozgasok nem.
         $k = $in['kartyak'];
         $kinfo = ['kurzor' => $k['kurzor'] ?? null, 'gen' => $k['gen'] ?? null,
                   'naplo_sor' => isset($k['naplo']['sorok']) ? count((array)$k['naplo']['sorok']) : 0,
                   'pillanatkep' => isset($k['pillanatkep']), 'egyeztetes' => isset($k['egyeztetes']),
+                  'azonositas' => isset($k['azonositasok']['lista']) ? count((array)$k['azonositasok']['lista']) : 0,
                   'hiba' => $k['hiba'] ?? ($valasz['kartyak_hiba'] ?? null)];
         $in['kartyak'] = $kinfo;
     }

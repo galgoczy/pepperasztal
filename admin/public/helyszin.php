@@ -77,7 +77,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             pa_audit($user, 'atnevezve', $s['kulcs'] . ' -> ' . $nev);
         }
     } elseif ($mit === 'torles' && ($_POST['megerosit'] ?? '') === $s['kulcs']) {
-        foreach (['jelentes', 'kartya', 'kartyamozgas', 'kartyavasarlas', 'parancs', 'helyszin_allapot'] as $t) {
+        foreach (['jelentes', 'kartya', 'kartyamozgas', 'kartyavasarlas', 'kartyaazonositas', 'parancs', 'helyszin_allapot'] as $t) {
             $db->prepare("DELETE FROM $t WHERE helyszin_id = ?")->execute([$id]);
         }
         $db->prepare('DELETE FROM helyszin WHERE id = ?')->execute([$id]);
@@ -163,6 +163,11 @@ $mst = $db->prepare('SELECT m.*, v.tetelek FROM kartyamozgas m LEFT JOIN kartyav
                      WHERE m.helyszin_id = ? ORDER BY m.naplo_id DESC LIMIT 30');
 $mst->execute([$id]);
 $mozgasok = $mst->fetchAll();
+$ast = $db->prepare('SELECT * FROM kartyaazonositas WHERE helyszin_id = ? ORDER BY nyugta_id DESC LIMIT 30');
+$ast->execute([$id]);
+$azonositasok = $ast->fetchAll();
+$nevek_map = [];
+foreach ($kartyak as $k) { $nevek_map[(int)$k['kartya_id']] = $k['nev_titkos']; }
 ?>
 <h2 id="kartyak">Feltöltős kártyák</h2>
 <?php
@@ -278,8 +283,6 @@ Az utasítás 10 percig érvényes; ha a gép addig nem veszi fel, lejár.</p>
 <?php if ($mozgasok): ?>
 <h2>Legutóbbi kártyamozgások</h2>
 <div class="card scroll"><table>
-<?php $nevek_map = [];
-foreach ($kartyak as $k) { $nevek_map[(int)$k['kartya_id']] = $k['nev_titkos']; } ?>
 <tr><th>Idő</th><th>Kártya-ID</th><?= $van_nev ? '<th>Név</th>' : '' ?><th>Mozgás</th><th class="num">Összeg</th><th class="num">Utána</th><th>Mit vett</th></tr>
 <?php foreach ($mozgasok as $mz): ?>
 <tr>
@@ -290,6 +293,24 @@ foreach ($kartyak as $k) { $nevek_map[(int)$k['kartya_id']] = $k['nev_titkos']; 
   <td class="num"><?= h(number_format((float)$mz['osszeg'], 0, ',', ' ')) ?></td>
   <td class="num"><?= h(number_format((float)$mz['elotte'] + (float)$mz['osszeg'], 0, ',', ' ')) ?></td>
   <td class="small"><?= h(pa_tetelek_szoveg($mz['tetelek'] ?? null)) ?></td>
+</tr>
+<?php endforeach; ?>
+</table></div>
+<?php endif; ?>
+
+<?php if ($azonositasok): ?>
+<h2>Kártya csak azonosításra</h2>
+<p class="muted">A vendég beolvastatta a feltöltős kártyáját, de mással fizetett (a kasszában 0 Ft-os VIP-sor). Az egyenleg nem változott.</p>
+<div class="card scroll"><table>
+<tr><th>Idő</th><th>Kártya-ID</th><?= $van_nev ? '<th>Név</th>' : '' ?><th class="num">Nyugta</th><th class="num">Végösszeg</th><th>Mit vett</th></tr>
+<?php foreach ($azonositasok as $az): ?>
+<tr>
+  <td><?= h($az['ido'] ?? '–') ?></td>
+  <td class="mono"><?= (int)$az['kartya_id'] ?></td>
+  <?php if ($van_nev): ?><td><?= h(pa_nev_mutat($nevek_map[(int)$az['kartya_id']] ?? null, $id, (int)$az['kartya_id'], $nmod)) ?></td><?php endif; ?>
+  <td class="num mono"><?= (int)$az['nyugta_id'] ?></td>
+  <td class="num"><?= $az['vegertek'] !== null ? h(number_format((float)$az['vegertek'], 0, ',', ' ')) : '–' ?></td>
+  <td class="small"><?= h(pa_tetelek_szoveg($az['tetelek'] ?? null)) ?></td>
 </tr>
 <?php endforeach; ?>
 </table></div>

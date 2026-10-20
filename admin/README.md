@@ -20,6 +20,10 @@ A POS gépek ügynökeinek felhős oldala a Hostingeren (PHP + MySQL). Az
   (vagy a kártyalista ▮▯▮ jelére) a telefon kijelzőjén vonalkódként
   jelenik meg, a pénztári olvasóval beolvasható. Minden megjelenítés
   naplózott. Kézzel beírt kódból is rajzol (az csak a telefonon marad).
+- **Kártya csak azonosításra:** ha a vendég beolvastatja a feltöltős
+  kártyáját, de mással fizet (a kasszában 0 Ft-os VIP-sor), a nyugta a
+  tételekkel a helyszín oldalán külön listában látszik, szintén néhány
+  másodpercen belül.
 - **Élő kártyamozgások:** nyitvatartásban egy kártyás fizetés a vásárolt
   tételekkel néhány másodpercen belül látszik a helyszín oldalán (az oldal
   10 másodpercenként frissül).

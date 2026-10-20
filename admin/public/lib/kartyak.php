@@ -11,6 +11,8 @@
  *   egyeztetes:  { ido, kartyak, naplo_nelkul, elteres: [...] }
  *   vasarlasok:  [{ naplo_id, nyugta, kartya, ido, osszeg, vegertek,
  *                   tetelek: [{nev, menny, ertek, kat_id, kat}] }]
+ *   azonositasok: { tol, ig, lista: [{ nyugta, kartya, ido, vegertek, tetelek }] }
+ *                (kartya csak azonositasra: 0 Ft-os VIP-sor, a fizetes mas modon)
  *
  * A mozgasok (helyszin, naplo-ID) szerint egyediek: az ujrakuldott sorok
  * nem duplazodnak. A valasz visszaigazolja, mit mentettunk - a gep csak
@@ -184,8 +186,65 @@ function pa_kartyak_fogad(int $hid, array $k): array
         }
     }
 
+    if (isset($k['azonositasok']) && is_array($k['azonositasok'])) {
+        $a = $k['azonositasok'];
+        $ig = (int)($a['ig'] ?? -1);
+        if ($ig < 0 || !is_array($a['lista'] ?? null) || count($a['lista']) > 500) {
+            throw new InvalidArgumentException('hibas azonositas-resz');
+        }
+        $info['azonositas'] = pa_azonositasok_fogad($hid, $a['lista']);
+        $ki['azonositas_ig'] = $ig;
+    }
+
     pa_hely_set($hid, 'kartya_info', json_encode($info));
     return $ki;
+}
+
+/** A tetelek ellenorzott, rovidebb alakja (vasarlas es azonositas). */
+function pa_tetelek_tiszta($lista): array
+{
+    if (!is_array($lista)) {
+        throw new InvalidArgumentException('hibas tetelek');
+    }
+    $ki = [];
+    foreach (array_slice($lista, 0, 100) as $t) {
+        $ki[] = [
+            'nev' => mb_substr((string)($t['nev'] ?? ''), 0, 60),
+            'menny' => round((float)($t['menny'] ?? 0), 3),
+            'ertek' => pa_penz($t['ertek'] ?? null),
+            'kat_id' => isset($t['kat_id']) ? (int)$t['kat_id'] : null,
+            'kat' => mb_substr((string)($t['kat'] ?? ''), 0, 40),
+        ];
+    }
+    return $ki;
+}
+
+/** Kartya csak azonositasra: mentes (nyugta + kartya szerint egyedi). */
+function pa_azonositasok_fogad(int $hid, array $lista): int
+{
+    $db = pa_db();
+    $ins = $db->prepare(pa_beszur_ignore() . ' INTO kartyaazonositas
+        (helyszin_id, nyugta_id, kartya_id, ido, vegertek, tetelek, erkezett)
+        VALUES (?, ?, ?, ?, ?, ?, ?)');
+    $uj = 0;
+    $db->beginTransaction();
+    try {
+        foreach ($lista as $v) {
+            $fej = (int)($v['nyugta'] ?? 0);
+            $kid = (int)($v['kartya'] ?? 0);
+            if ($fej <= 0 || $kid <= 0) {
+                throw new InvalidArgumentException('hibas azonositas');
+            }
+            $ins->execute([$hid, $fej, $kid, pa_ido_ok($v['ido'] ?? ''), pa_penz($v['vegertek'] ?? null),
+                           json_encode(pa_tetelek_tiszta($v['tetelek'] ?? []), JSON_UNESCAPED_UNICODE), pa_now()]);
+            $uj += $ins->rowCount();
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+    return $uj;
 }
 
 function pa_kartya_naplo_frissit(int $hid, int $kid): void

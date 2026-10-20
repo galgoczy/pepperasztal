@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-const PA_SCHEMA_VERSION = 7;
+const PA_SCHEMA_VERSION = 8;
 
 function pa_is_sqlite(): bool
 {
@@ -123,6 +123,16 @@ function pa_migrate(): void
         vegertek DECIMAL(14,2) NULL,
         tetelek MEDIUMTEXT NULL,
         PRIMARY KEY (helyszin_id, naplo_id))$tail");
+    // 8: kartya csak azonositasra (0 Ft-os VIP-sor a nyugtan), a tetelekkel
+    $db->exec("CREATE TABLE IF NOT EXISTS kartyaazonositas (
+        helyszin_id INT NOT NULL,
+        nyugta_id INT NOT NULL,
+        kartya_id INT NOT NULL,
+        ido VARCHAR(19) NULL,
+        vegertek DECIMAL(14,2) NULL,
+        tetelek MEDIUMTEXT NULL,
+        erkezett VARCHAR(19) NOT NULL,
+        PRIMARY KEY (helyszin_id, nyugta_id, kartya_id))$tail");
     // 4: a kartya neve titkositva (lib/titok.php)
     try {
         $db->exec('ALTER TABLE kartya ADD COLUMN nev_titkos TEXT NULL');

@@ -228,23 +228,30 @@ def felold():
 def gyors_figyeles(cfg, url, token, t0, utolso_gen):
     """
     Nyitvatartasban a percenkenti futas nem lep ki azonnal: FUTAS_MP-ig
-    utem masodpercenkent megnezi a kartyanaplo generatorat (egy apro
-    lekerdezes), es csak valtozaskor kuld - a mozgast, az uj egyenleget es
-    a vasarolt teteleket. Uj utemezett feladat nem kell hozza.
+    utem masodpercenkent megnezi a kartyanaplo generatorat es azt, hogy van-e
+    uj nyugta (egy apro lekerdezes), es csak valtozaskor kuld - a mozgast, az
+    uj egyenleget, a vasarolt teteleket es a csak azonositasra hasznalt
+    kartyakat. Uj utemezett feladat nem kell hozza.
     """
     g = cfg.gyors
     ora = int(time.strftime("%H"))
     if not g["be"] or not cfg.kartyak["kuldes"] or not (g["tol"] <= ora < g["ig"]):
         return
     import kartyak
+    try:
+        fej = kartyak.fej_kurzor(cfg)
+    except Exception:
+        fej = None
     while time.time() - t0 + g["utem"] < FUTAS_MP:
         time.sleep(g["utem"])
-        db = db_proba(cfg)
-        gen = db.get("naplo_gen") if db.get("ok") else None
-        if gen is None or gen == utolso_gen:
+        try:
+            gen, uj_fej = kartyak.figyel(cfg, fej)
+        except Exception:
+            gen, uj_fej = None, None
+        if gen is None or (gen == utolso_gen and uj_fej is None):
             continue
         try:
-            ki = kartyak.gyujt(cfg, gen)
+            ki = kartyak.gyujt(cfg, gen, uj_fej)
             if not ki:
                 return
             resp = post(url, token, {
@@ -254,6 +261,7 @@ def gyors_figyeles(cfg, url, token, t0, utolso_gen):
             kartyak.nyugtaz(ki, resp)
             if resp.get("ok"):
                 utolso_gen = gen
+                fej = kartyak.fej_kurzor(cfg)
         except Exception as e:
             log("gyors figyeles hiba: {0}".format(str(e)[:200]))
             return

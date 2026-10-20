@@ -200,6 +200,9 @@ A `jelentes.py` percenként elküldi a mentés állapotát, egy adatbázis-prób
 - naponta egyszer (02:00 után) egyeztetés: kassza szerinti egyenleg =
   utolsó naplósor szerinti egyenleg.
 
+A csak azonosításra használt kártya (a vendég mással fizet, a kasszában
+0 Ft-os VIP-sor) nyugtája is felmegy a tételekkel.
+
 A feltöltős kártyák neve is felmegy (a szerver titkosítva tárolja, az
 adminban alapból csillagozva látszik); kikapcsolás: `[kartyak]` →
 `nevek = nem`. A kártyakód is felmegy, szintén titkosítva, hogy az admin
