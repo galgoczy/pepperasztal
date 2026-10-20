@@ -19,6 +19,7 @@ A VIP-app tervezese elott ezekre a kerdesekre kell valasz:
   10. Van-e azonos nevu kartya (pl. szemelyzeti + feltoltos)?
   11. Mit ellenoriznek a kartya-triggerek es az NH$CHK_DBL_VIP_CARD?
   12. Rogziti-e a kassza a kartyat fizetes nelkul (csak azonositas)?
+  13. --utolso: egy kasszai proba nyoma a legutobbi nyugtakban.
 
 BIZTONSAG
   * A script minden utasitast ellenoriz: csak SELECT / SET LIST / SHOW
@@ -38,6 +39,8 @@ FUTTATAS (a POS gepen, a pepper_agent.ini mellett):
     python felderites.py
     python felderites.py --nyugtak 50000      (kisebb ablak)
     python felderites.py --user sysdba        (ha PEPPER_OLVAS meg nincs)
+    python felderites.py --utolso 5 --kartya 123
+        (csak a legutobbi 5 nyugta minden mezoje; gyors, nyitvatartasban is)
 
 Kimenet: felderites_<helyszin>_<datum>.txt a script mellett.
 """
@@ -1241,6 +1244,131 @@ def sec_azonositas(db, rep, lo):
 
 
 # ===========================================================================
+# 12. A legutobbi nyugtak minden mezoje (gyors, celzott ellenorzeshez)
+# ===========================================================================
+
+SZOVEG_TIPUS = ("14", "37")          # CHAR, VARCHAR
+BLOB_TIPUS = ("261",)
+KODSZERU = re.compile(r"^;\d{8,}\?$")
+
+
+def _oszlopok(db, tabla):
+    rows, e = db.rows(
+        "SELECT RF.RDB$FIELD_NAME AS M, F.RDB$FIELD_TYPE AS FT FROM "
+        "RDB$RELATION_FIELDS RF JOIN RDB$FIELDS F ON F.RDB$FIELD_NAME = "
+        "RF.RDB$FIELD_SOURCE WHERE RF.RDB$RELATION_NAME = '{0}' ORDER BY "
+        "RF.RDB$FIELD_POSITION;".format(tabla), ["M", "FT"])
+    ki = []
+    for r in rows:
+        m, ft = (r.get("M") or "").strip(), (r.get("FT") or "").strip()
+        if IDENT.match(m) and ft not in BLOB_TIPUS:
+            ki.append((m, ft))
+    return ki, e
+
+
+def _ertek(v, ft, kartya):
+    """Szam/datum: ahogy van. Szoveg: csak a rovid kodok (pl. 'FIZ'), a
+    tobbi helyett a hossza - nev, kartyakod nem kerul a jelentesbe."""
+    if v is None:
+        return "NULL"
+    if ft in SZOVEG_TIPUS:
+        t = v.strip()
+        if not t:
+            return "''"
+        if KODSZERU.match(t):
+            return "<KARTYAKOD-SZERU szoveg, {0} kar>".format(len(t))
+        if len(t) <= 4:
+            return "'" + mask_digits(t) + "'"
+        return "<szoveg, {0} kar>".format(len(t))
+    t = v.strip()
+    if kartya and re.match(r"^-?\d+(\.0+)?$", t) and int(float(t)) == kartya:
+        return t + "   <== EGYEZIK A KARTYA-ID-VEL"
+    return t
+
+
+def _tabla_kiir(db, rep, tabla, kulcs, lo, kartya, rendezes):
+    osz, e = _oszlopok(db, tabla)
+    rep.err(e)
+    if not osz:
+        rep.text("{0}: nem olvashato".format(tabla))
+        return
+    sorok, e = db.rows("SELECT {0} FROM {1} X WHERE X.{2} > {3};".format(
+        ", ".join("X." + m for m, _ in osz), tabla, kulcs, lo),
+        [m for m, _ in osz])
+    rep.err(e)
+    sorok.sort(key=lambda r: [_i(r.get(k)) or 0 for k in rendezes])
+    for r in sorok:
+        rep.sub("{0} {1}".format(tabla, " ".join(
+            "{0}={1}".format(k, r.get(k)) for k in rendezes)))
+        for m, ft in osz:
+            rep.kv("  " + m, _ertek(r.get(m), ft, kartya))
+    if not sorok:
+        rep.text("{0}: nincs sor".format(tabla))
+
+
+def sec_utolso(db, rep, n, kartya):
+    """A legutobbi n nyugta minden mezoje. Arra valo, hogy egy most, a
+    kasszan vegrehajtott proba (pl. kartya csak azonositasra) nyoma
+    megtalalhato legyen: melyik mezobe, melyik tablaba ir a kassza."""
+    rep.h("12. A LEGUTOBBI {0} NYUGTA MINDEN MEZOJE".format(n))
+    if kartya:
+        rep.text("Keresett kartya-ID: {0} (a vele egyezo szamok jelolve)".format(kartya))
+    mx, e = db.num("SELECT MAX(ID) AS MX FROM NYUGTAFEJ;", "MX")
+    rep.err(e)
+    if mx is None:
+        return
+    lo = mx - n
+    _tabla_kiir(db, rep, "NYUGTAFEJ", "ID", lo, kartya, ["ID"])
+    _tabla_kiir(db, rep, "NYUGTAFIZETES", "FEJ", lo, kartya, ["FEJ", "ID"])
+
+    rep.sub("KARTYANAPLO utolso 10 sora")
+    g, e = db.num("SELECT MAX(ID) AS MX FROM KARTYANAPLO;", "MX")
+    rep.err(e)
+    if g is not None:
+        sorok, e = db.rows(
+            "SELECT L.ID AS ID, L.KARTYA AS K, L.TTIPUS AS T, L.OSSZEG AS O, "
+            "L.DATUM AS D FROM KARTYANAPLO L WHERE L.ID > {0};".format(g - 10),
+            ["ID", "K", "T", "O", "D"])
+        rep.err(e)
+        for r in sorted(sorok, key=lambda r: _i(r.get("ID")) or 0):
+            rep.text("{0:>8}  kartya {1:>6}  {2:<3} {3:>12}  {4}".format(
+                r.get("ID"), r.get("K"), (r.get("T") or "").strip(),
+                r.get("O"), (r.get("D") or "")[:19]))
+
+    if kartya:
+        rep.sub("KARTYATORZS {0} (szamok es datumok; nev, kod nelkul)".format(kartya))
+        osz, e = _oszlopok(db, "KARTYATORZS")
+        rep.err(e)
+        osz = [(m, ft) for m, ft in osz if ft not in SZOVEG_TIPUS]
+        if osz:
+            sorok, e = db.rows("SELECT {0} FROM KARTYATORZS X WHERE X.ID = {1};".format(
+                ", ".join("X." + m for m, _ in osz), int(kartya)), [m for m, _ in osz])
+            rep.err(e)
+            for r in sorok:
+                for m, ft in osz:
+                    rep.kv("  " + m, (r.get(m) or "NULL").strip())
+
+    rep.sub("Tablak, amelyeknek kartyara utalo nevu oszlopa van")
+    rows, e = db.rows(
+        "SELECT RF.RDB$RELATION_NAME AS T, RF.RDB$FIELD_NAME AS M FROM "
+        "RDB$RELATION_FIELDS RF JOIN RDB$RELATIONS R ON R.RDB$RELATION_NAME = "
+        "RF.RDB$RELATION_NAME WHERE R.RDB$SYSTEM_FLAG = 0 ORDER BY "
+        "RF.RDB$RELATION_NAME;", ["T", "M"])
+    rep.err(e)
+    tab = {}
+    for r in rows:
+        t, m = (r.get("T") or "").strip(), (r.get("M") or "").strip()
+        if re.search(r"KART|KKOD|VIP", m):
+            tab.setdefault(t, []).append(m)
+    for t in sorted(tab):
+        rep.text("{0}: {1}".format(t, ", ".join(tab[t])))
+    rep.verdict("Ha a csak azonositasra hasznalt kartya ID-ja sehol nincs "
+                "jelolve, es KARTYAKOD-SZERU szoveg sincs, akkor a kassza a "
+                "nyugtan nem rogziti; ekkor a fenti tablalista mutatja, hol "
+                "lehet meg.")
+
+
+# ===========================================================================
 
 def main():
     ap = argparse.ArgumentParser(description="Csak olvaso felderites.")
@@ -1251,6 +1379,11 @@ def main():
     ap.add_argument("--kis-ablak", type=int, default=10000,
                     help="a reszletes (teteles) vizsgalat ablaka, nyugtaban "
                          "(alap: 10000)")
+    ap.add_argument("--utolso", type=int, metavar="N",
+                    help="CSAK a legutobbi N nyugta minden mezoje (gyors; "
+                         "pl. egy kasszai proba utan)")
+    ap.add_argument("--kartya", type=int, metavar="ID",
+                    help="az --utolso mellett: ezt a kartya-ID-t jeloli")
     args = ap.parse_args()
 
     cfg = load_config()
@@ -1277,6 +1410,11 @@ def main():
                                                          AGENT_VERSION),
                   "A jelentes nem tartalmaz nevet, kartyakodot vagy mas "
                   "szemelyes adatot."]
+
+    if args.utolso:
+        db.progress("-- 12. legutobbi nyugtak")
+        sec_utolso(db, rep, max(1, min(50, args.utolso)), args.kartya)
+        return _ment(cfg, db, rep, "utolso")
 
     db.progress("-- 0. kornyezet")
     sec_kornyezet(cfg, rep, tools_ok, db)
@@ -1312,13 +1450,17 @@ def main():
         sec_azonositas(db, rep, lo_kicsi)
     db.progress("-- kesz")
 
+    _ment(cfg, db, rep, "felderites")
+
+
+def _ment(cfg, db, rep, elotag):
     if db.errors:
         rep.h("ISQL HIBAK OSSZESITVE ({0})".format(len(db.errors)))
         for sql, err in db.errors:
             rep.text(sql)
             rep.text("  -> " + err.strip().splitlines()[0][:110])
 
-    name = "felderites_{0}_{1}.txt".format(
+    name = elotag + "_{0}_{1}.txt".format(
         re.sub(r"[^A-Za-z0-9]+", "", cfg.helyszin or socket.gethostname()),
         time.strftime("%Y%m%d_%H%M"))
     path = os.path.join(HERE, name)
