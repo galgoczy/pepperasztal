@@ -66,6 +66,13 @@ Nyitott tételek, nagyjából fontossági sorrendben. A kész tételek kikerüln
   elkülönülő tartomány kell (pl. saját „dátum”-blokk), hogy ne ütközzön a
   NovoHost-kártyákkal. A dátumok múltbeliek (valószínűleg a kártyaadag
   gyártási/kódolási napja). TTK-ban ugyanez a forma (2021–2024-es adagok).
+- **Kártya csak azonosításra (élő próba, Szentkirályi, 2026-10-20 12:11,
+  nyugta 52021, kártya 565):** a kassza egy **0 Ft-os VIP-fizetési sort**
+  ír (`NYUGTAFIZETES`: `FIZTIPID = 10`, `FORINT = 0`, `KKODID` = kártya-ID,
+  `KTIPUS` = kártyatípus); a tényleges fizetés külön soron megy. Kártyanapló-
+  sor nem keletkezik. A korábbi „csak VIP-fizetésnél kerül a nyugtára”
+  megállapítás ezért pontatlan: az azonosítás is VIP-sor, csak 0 Ft-tal.
+  Ebből a vásárolt tételek az azonosított vendéghez rendelhetők (pontgyűjtés).
 - **Vonalkód-teszt a régi USB-s olvasóval.** Telefon maximális fényerőn,
   először Jegyzettömbbe olvasva: beolvassa-e a kijelzőt, és helyesen
   érkeznek-e a `;` és `?` karakterek. Utána a NovoHost VIP-kártyás ablakában
