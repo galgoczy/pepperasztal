@@ -1,0 +1,59 @@
+# =====================================================================
+#  Tarhely-ellenorzes: a pepperadmin webmappaja egyezik-e a repoval?
+#  ---------------------------------------------------------------------
+#  Letolti FTP-n a teljes webmappat (a konfiguracio nelkul), es
+#  osszeveti az admin/public tartalmaval: varatlan, megvaltozott, hianyzo
+#  fajlok, webshell-mintak, a kiadasok alairasa, legutobbi modositasok,
+#  PHP hibanaplok. A fajlok tartalmat nem irja ki.
+#
+#  INDITAS: kezzel (Actions -> "Tarhely-ellenorzes" -> Run workflow), vagy
+#  automatikusan, ha ez a fajl vagy az ellenorzo script valtozik.
+# =====================================================================
+
+name: Tarhely-ellenorzes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - '.github/workflows/tarhely-ellenorzes.yml'
+      - '.github/scripts/tarhely_ellenorzes.py'
+
+# Ne fusson egyszerre a feltoltessel.
+concurrency:
+  group: deploy-admin
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ellenorzes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kod letoltese
+        uses: actions/checkout@v5
+
+      - name: lftp telepitese
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Webmappa letoltese (konfiguracio nelkul)
+        env:
+          S: ${{ secrets.FTP_SERVER }}
+          U: ${{ secrets.FTP_USERNAME }}
+          P: ${{ secrets.FTP_PASSWORD }}
+          D: ${{ vars.FTP_DIR || '.' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/tavoli"
+          lftp -u "$U,$P" "$S" -e "set ftp:ssl-allow no; set net:timeout 60; set net:max-retries 3; echo '== Az FTP-fiok gyokere:'; cls -l /; mirror --parallel=4 --exclude-glob pepperadmin-config.php --exclude-glob config.php --exclude-glob config.*.php '$D' '$RUNNER_TEMP/tavoli'; bye"
+          echo "letoltve: $(find "$RUNNER_TEMP/tavoli" -type f | wc -l) fajl"
+
+      - name: Osszevetes a repoval
+        run: python3 .github/scripts/tarhely_ellenorzes.py "$RUNNER_TEMP/tavoli" admin/public agent
+
+      - name: Takaritas
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/tavoli"

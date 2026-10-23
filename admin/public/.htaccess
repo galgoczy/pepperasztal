@@ -1,0 +1,17 @@
+# Pepper Admin - Hostinger (LiteSpeed/Apache)
+
+Options -Indexes
+
+# Mindig HTTPS
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Konfiguracio, naplok, a deploy allapotfajlja es minden rejtett fajl
+# kozvetlenul nem toltheto le.
+<FilesMatch "(^\.|^config.*\.php$|\.(md|sql|json|ini|log|example)$)">
+    Require all denied
+</FilesMatch>
+<Files "build.txt">
+    Require all denied
+</Files>

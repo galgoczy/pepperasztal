@@ -1,0 +1,149 @@
+<?php
+/**
+ * POST /api/jelentes.php - a POS gepek percenkenti eletjele.
+ *
+ * Fejlec:  X-Pepper-Token: <helyszin tokenje>
+ * Torzs:   JSON { helyszin, gep, agent_verzio, ..., kartyak } (max 1 MB)
+ *
+ * A token a szerveren csak sha256-hash-kent van meg. A torzsben kuldott
+ * helyszin-kulcsnak egyeznie kell a tokenhez tartozoval - igy egy rossz
+ * gepre masolt ini nem irja felul egy masik helyszin allapotat.
+ *
+ * Valasz: { ok, szerver_ido, frissites: null | { verzio, sha256 },
+ *           naplo_ig?, pillanatkep_ok?, egyeztetes_ok? }
+ * A kartyak resze (feltoltos kartyak mozgasai): lib/kartyak.php.
+ * "gyors": true - percen beluli kartyajelentes, csak a kartyaadatot menti.
+ * A frissitest a gep csak akkor kapja meg, ha az adminban erre a
+ * helyszinre ki lett jelolve (cel_verzio), es van ilyen alairt kiadas.
+ * Utasitas (lib/parancs.php): a valasz "parancsok" mezojeben, ha az adminban
+ * egyenleg-modositast kertek. A gep csak [iras] be = igen eseten hajtja vegre;
+ * az eredmenyt a kovetkezo jelentes "parancs_eredmeny" mezoje hozza.
+ */
+
+declare(strict_types=1);
+require __DIR__ . '/../lib/bootstrap.php';
+require __DIR__ . '/../lib/schema.php';
+require __DIR__ . '/../lib/kiadas.php';
+require __DIR__ . '/../lib/kartyak.php';
+require __DIR__ . '/../lib/parancs.php';
+
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+
+function fail(int $code, string $msg): void
+{
+    http_response_code($code);
+    echo json_encode(['ok' => false, 'hiba' => $msg], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    fail(405, 'csak POST');
+}
+$token = (string)($_SERVER['HTTP_X_PEPPER_TOKEN'] ?? '');
+if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+    fail(401, 'hianyzo vagy hibas token');
+}
+$raw = file_get_contents('php://input', false, null, 0, 1048577);
+if ($raw === false || strlen($raw) > 1048576) {
+    fail(413, 'tul nagy torzs');
+}
+$in = json_decode($raw, true);
+if (!is_array($in)) {
+    fail(400, 'nem JSON');
+}
+
+try {
+    pa_migrate();
+    $db = pa_db();
+    $st = $db->prepare('SELECT * FROM helyszin WHERE token_hash = ?');
+    $st->execute([hash('sha256', $token)]);
+    $site = $st->fetch();
+    if (!$site) {
+        usleep(300000);
+        fail(401, 'ismeretlen token');
+    }
+    if ((string)($in['helyszin'] ?? '') !== $site['kulcs']) {
+        fail(403, 'a token nem ehhez a helyszinhez tartozik');
+    }
+
+    $valasz = [];
+    $kinfo = null;
+    // A gep eredmenyei a korabbi utasitasokra (gyors es normal jelentesben is).
+    if (isset($in['parancs_eredmeny']) && is_array($in['parancs_eredmeny'])) {
+        $valasz['parancs_ack'] = pa_parancs_eredmeny((int)$site['id'], $site['kulcs'],
+            $in['parancs_eredmeny']);
+        unset($in['parancs_eredmeny']);
+    }
+    if (isset($in['kartyak']) && is_array($in['kartyak'])) {
+        try {
+            $valasz += pa_kartyak_fogad((int)$site['id'], $in['kartyak']);
+        } catch (Throwable $e) {
+            // Hibas kartya-resz (vagy adatbazis-hiba): az eletjel megmarad,
+            // a gep nem lep tovabb, a hiba latszik az adminban.
+            $valasz['kartyak_hiba'] = mb_substr($e->getMessage(), 0, 200);
+            if (!($e instanceof InvalidArgumentException)) {
+                error_log('pepperadmin kartyak: ' . $e->getMessage());
+            }
+            $ki0 = json_decode((string)(pa_hely_get((int)$site['id'], 'kartya_info')['v'] ?? ''), true) ?: [];
+            $ki0['szerver_hiba'] = pa_now() . ' ' . $valasz['kartyak_hiba'];
+            pa_hely_set((int)$site['id'], 'kartya_info', json_encode($ki0));
+        }
+        // A nyers jelentesbe csak az osszegzes kerul, a mozgasok nem.
+        $k = $in['kartyak'];
+        $kinfo = ['kurzor' => $k['kurzor'] ?? null, 'gen' => $k['gen'] ?? null,
+                  'naplo_sor' => isset($k['naplo']['sorok']) ? count((array)$k['naplo']['sorok']) : 0,
+                  'pillanatkep' => isset($k['pillanatkep']), 'egyeztetes' => isset($k['egyeztetes']),
+                  'azonositas' => isset($k['azonositasok']['lista']) ? count((array)$k['azonositasok']['lista']) : 0,
+                  'hiba' => $k['hiba'] ?? ($valasz['kartyak_hiba'] ?? null)];
+        $in['kartyak'] = $kinfo;
+    }
+
+    // Gyors jelentes (csak kartyamozgas, percen beluli): az eletjel-sort nem
+    // irja felul, igy a mentes- es gepadatok a percenkenti jelentesbol maradnak.
+    if (!empty($in['gyors'])) {
+        pa_hely_set((int)$site['id'], 'gyors_ido', pa_now());
+        echo json_encode(['ok' => true, 'szerver_ido' => pa_now(), 'frissites' => null] + $valasz,
+            JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $ver = substr((string)($in['agent_verzio'] ?? ''), 0, 32);
+    $adat = $kinfo === null ? $raw : json_encode($in, JSON_UNESCAPED_UNICODE);
+    // "gep" a gep neve; a 2026-10-19.5-os ugynok tevedesbol a terhelest
+    // kuldte ezen a kulcson - azt nem irjuk a gepnev helyere.
+    $gepnev = is_string($in['gep'] ?? null) ? $in['gep'] : '';
+    $row = [pa_now(), pa_client_ip_api(), substr($gepnev, 0, 100),
+            $ver, $adat, (int)$site['id']];
+    $upd = $db->prepare('UPDATE jelentes SET ido = ?, ip = ?, gep = ?, agent_verzio = ?, adat = ?
+                         WHERE helyszin_id = ?');
+    $upd->execute($row);
+    if ($upd->rowCount() === 0) {
+        $db->prepare('INSERT INTO jelentes (ido, ip, gep, agent_verzio, adat, helyszin_id)
+                      VALUES (?, ?, ?, ?, ?, ?)')->execute($row);
+    }
+
+    $frissites = null;
+    $cel = $site['cel_verzio'];
+    if ($cel && $ver !== '' && pa_ver_cmp($cel, $ver) > 0) {
+        $k = pa_kiadas($cel);
+        if ($k) {
+            $frissites = ['verzio' => $k['verzio'], 'sha256' => $k['sha256']];
+        }
+    }
+    // Utasitasok a gepnek (csak a percenkenti jelentes valaszaban).
+    $parancsok = pa_parancs_kiad((int)$site['id']);
+    if ($parancsok) {
+        $valasz['parancsok'] = $parancsok;
+    }
+    echo json_encode(['ok' => true, 'szerver_ido' => pa_now(), 'frissites' => $frissites] + $valasz,
+        JSON_UNESCAPED_UNICODE);
+} catch (Throwable $e) {
+    error_log('pepperadmin jelentes: ' . $e->getMessage());
+    fail(500, 'szerverhiba');
+}
+
+function pa_client_ip_api(): string
+{
+    return substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
+}

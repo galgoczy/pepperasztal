@@ -1,0 +1,107 @@
+; =====================================================================
+; pepper_agent.ini.example
+; ---------------------------------------------------------------------
+; Masold at pepper_agent.ini neven a scriptek melle, es toltsd ki.
+; A pepper_agent.ini NEM kerul a gitbe (.gitignore) - jelszavak vannak benne.
+;
+; JELSZAVAK: nyilt "password =" helyett hasznalj "password_dpapi =" sort.
+; A DPAPI-blob gephez kotott: masik gepre masolva hasznalhatatlan.
+;   SYSDBA:        python setup_users.py titkosit
+;   PEPPER_* uj:   python setup_users.py jelszo
+; Ha mindketto szerepel, a password_dpapi nyer.
+;
+; A MAPPA JOGAI: ezt a mappat csak a Rendszergazdak es a SYSTEM olvashassa.
+; Lasd README, "1. Telepites".
+; =====================================================================
+
+[general]
+; A helyszin kulcsa, ekezet es szokoz nelkul - PONTOSAN az, amit az adminban
+; az "Uj helyszin"-nel megadtal (pl. Szentkiralyi, Allamkincstar). A token
+; csak ehhez a kulcshoz ervenyes. Fajlnevekben is ez latszik.
+helyszin =
+
+[interbase]
+; Csak akkor kell, ha nem az alapertelmezett helyen van.
+; bin = C:\Program Files (x86)\Borland\InterBase\bin
+; db_path = C:\Program Files (x86)\novohost2\nhtouch\data\novohost.ib
+; A felhasznalokat tarolo adatbazis (IB 7.x: admin.ib, IB6: isc4.gdb).
+; Alapbol az InterBase mappajaban keressuk (a bin feletti mappa).
+; security_db = C:\Program Files (x86)\Borland\InterBase\admin.ib
+
+[sysdba]
+; A NovoHost meglevo SYSDBA jelszava. NEM valtoztatjuk meg.
+; Ezt csak a mentes (gbak) es a setup_users.py hasznalja.
+password_dpapi =
+
+[olvas]
+; Csak olvaso felhasznalo (setup_users.py hozza letre).
+user = PEPPER_OLVAS
+password_dpapi =
+; Ezeket a tablakat az olvaso felhasznalo sem latja (szemelyes adat).
+; kihagy = KARTYATULAJDONOS
+
+[vip]
+; A VIP-ugynok felhasznaloja: csak a kartya- es naplotablara ir.
+user = PEPPER_VIP
+password_dpapi =
+
+[felho]
+; A Pepper Admin cime es a helyszin tokenje. A tokent az adminban kapod,
+; amikor felveszed a helyszint (csak egyszer latszik). Titkositas:
+;   ird be ide a 'token = <az adminban kapott token>' sort, majd
+;   python jelentes.py --titkosit   -> helyben 'token_dpapi = ...' lesz belole
+url = https://pepperadmin.zentopia.io
+token =
+
+[kartyak]
+; Feltoltos kartyak mozgasai, egyenlegei, neve es kodja a Pepper Adminnak
+; (a nevet es a kodot a szerver titkositva tarolja).
+; kuldes = nem -> semmi nem megy fel; nevek = nem -> a nevek nem mennek fel,
+; es a szerver a mar tarolt neveket is torli; kodok = nem -> ugyanez a
+; kartyakodokkal (a vonalkod-oldalhoz kellenek).
+; kezdet: ettol a KARTYANAPLO.ID-tol kuld (0 = a teljes elozmeny).
+kuldes = igen
+nevek = igen
+kodok = igen
+kezdet = 0
+
+[gyors]
+; Nyitvatartasban (tol-ig ora) a percenkenti futas utem mp-enkent ranez a
+; kartyanaplora, es egy kartyas fizetes nehany mp-en belul latszik az
+; adminban. be = nem -> csak percenkent.
+be = igen
+tol = 6
+ig = 21
+utem = 5
+
+[iras]
+; Egyenleg-modositas (feltoltes / levonas) a Pepper Admin utasitasara, a
+; PEPPER_VIP felhasznaloval. Alapbol KI: csak ahol itt be = igen all, ott
+; hajt vegre a gep barmilyen irast. A 10 percnel regebbi utasitas lejar.
+; kezelo / pg: a naplosor KEZELO es PG mezoje (Szentkiralyin 16 / 1).
+be = nem
+; kezelo = 16
+; pg = 1
+
+[backup]
+; Helyi mentesek. NE a Program Files ala (VirtualStore-csapda).
+; A pontos meretet (DB / gbk / archivum) az elso futas naploja kiirja.
+mappa = C:\PepperApp\backup
+
+; Masolat a gepen KIVUL (opcionalis). Enelkul egy lemezhiba, lopas vagy
+; zsarolovirus az adatbazist ES a mentest is viszi. Kesobb a dashboard
+; titkositott feltoltese valthatja ki.
+; masolat_mappa = \\NAS\pepper\mentesek\Knorr105
+
+; Megorzes: ennyi napi es ennyi heti mentes marad meg.
+napi_db = 7
+heti_db = 4
+
+; A napkozbeni (06-16, ketorankenti) mentesek ennyi oraig maradnak meg.
+napkozbeni_ora = 48
+
+; Titkositas (ajanlott, ha a masolat felhobe megy): 7-Zip, AES-256.
+; Az archiv-jelszot TAROLD A GEPEN KIVUL IS (jelszokezelo) - ha a gep
+; meghal, a DPAPI-blob vele hal, es a mentes nem lesz kibonthato.
+; sevenzip = C:\Program Files\7-Zip\7z.exe
+; password_dpapi =
